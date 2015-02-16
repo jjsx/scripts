@@ -136,7 +136,7 @@ for i in "${hdd_array[@]}"; do
 	
 
 		echo "Flashing firmware: $i"
-		echo "$smux -flash $fw_file -confirm /dev/rdsk/$i >> $log 2>&1"
+		$smux -flash $fw_file -confirm /dev/rdsk/$i >> $log 2>&1
 		if [ $? != 0 ]; then
 		die "flashing $i"
 		return;
@@ -144,7 +144,7 @@ for i in "${hdd_array[@]}"; do
 		fi
 
 		echo "Onlining: $i"
-		echo "zpool online $pool_name $i >> $log 2>&1"
+		zpool online $pool_name $i >> $log 2>&1
 		if [ $? != 0 ]; then
 		die "onlining $i"
 		return;
@@ -154,7 +154,7 @@ for i in "${hdd_array[@]}"; do
 		echo ""
 else
 		echo "Flashing firmware: $i"
-		echo "$smux -flash $fw_file -confirm /dev/rdsk/$i >> $log 2>&1"
+		$smux -flash $fw_file -confirm /dev/rdsk/$i >> $log 2>&1
 		if [ $? != 0 ]; then
 		die "flashing $i"
 		return;
