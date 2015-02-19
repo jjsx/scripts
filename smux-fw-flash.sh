@@ -7,7 +7,6 @@ log="$script-$hostname-$now.log"
 
 # author: john sanderson
 # https://github.com/jjsx
-# johnxsanderson@gmail.com
 # date: 2/14/15
 # this script is to be used to hdd firmware on nexenta/solaris using smartmon-ux
 # smux-fw-flash.sh
@@ -48,12 +47,16 @@ confirm
 
 smux="/usr/bin/smartmon-ux"
 
+
 while [ ! -e $smux ]; do
 	echo "smartmon-ux not found in $smux"
 	echo "Enter location of smartmon-ux:"
 	echo "(include '.' if current directory, i.e. './smartmon-ux', otherwise ex. '/path/to/smartmon-ux'"
 	read smux
 done
+
+printf "Running device cleanup..\n"
+devfsadm -C
 
 hdd_models=(`iostat -En | sed -n 's/^.*Product//p' | awk '{print $2}' | sort | uniq`)
 dm=0
@@ -85,7 +88,7 @@ read desired_fw
 fi
 
 if [ ! $4 ]; then
-echo "Enter pool name that owns the disks so they can be offlined:"
+echo "Enter pool name that owns the disks so they can be offlined (leave null if not in a pool):"
 read pool_name
 fi
 while [ ! `zpool status $pool_name | grep -i "pool: $pool_name" | awk '{print $2}'` ]; do
@@ -119,16 +122,18 @@ svcadm disable -s svc:/system/fmd:default >> $log 2>&1
 
 die() {
 	# var dump
-	printf "smux $smux\nhdd_model $hdd_model\nfw_file $fw_file\ndesired_fw $desired_fw\npool_name $pool_name\nhdd_wwn ${hdd_wwn[@]}\nhdd_array ${hdd_array[@]}\nhdd_count $hdd_count\n"
-	echo "$1 failed, exiting. >> $log 2>&1";
+	printf "variable dump:\nsmux $smux\nhdd_model $hdd_model\nfw_file $fw_file\ndesired_fw $desired_fw\npool_name $pool_name\nhdd_wwn ${hdd_wwn[@]}\nhdd_array ${hdd_array[@]}\nhdd_count $hdd_count\nfailure message:\n" >> $log 2>&1
+	echo "$1 failed, exiting." >> $log
+	echo "$1 failed, exiting."
+	echo "Review log file: $log"
 		exit 1
 	return
 }
 
 for i in "${hdd_array[@]}"; do
-	if [ `zpool status $pool_name | grep $i` ]; then
+	if [ `zpool status $pool_name | grep $i | awk '{print $1}'` ]; then
 		echo "Offlining: $i"
-		echo "zpool offline $pool_name $i >> $log 2>&1"
+		zpool offline $pool_name $i >> $log 2>&1
 		if [ $? != 0 ]; then
 		die "offlining $i"
 		return;
@@ -136,7 +141,7 @@ for i in "${hdd_array[@]}"; do
 	
 
 		echo "Flashing firmware: $i"
-		echo "$smux -flash $fw_file -confirm /dev/rdsk/$i >> $log 2>&1"
+		$smux -flash $fw_file -confirm /dev/rdsk/$i >> $log 2>&1
 		if [ $? != 0 ]; then
 		die "flashing $i"
 		return;
@@ -144,7 +149,7 @@ for i in "${hdd_array[@]}"; do
 		fi
 
 		echo "Onlining: $i"
-		echo "zpool online $pool_name $i >> $log 2>&1"
+		zpool online $pool_name $i >> $log 2>&1
 		if [ $? != 0 ]; then
 		die "onlining $i"
 		return;
@@ -154,7 +159,7 @@ for i in "${hdd_array[@]}"; do
 		echo ""
 else
 		echo "Flashing firmware: $i"
-		echo "$smux -flash $fw_file -confirm /dev/rdsk/$i >> $log 2>&1"
+		$smux -flash $fw_file -confirm /dev/rdsk/$i >> $log 2>&1
 		if [ $? != 0 ]; then
 		die "flashing $i"
 		return;
