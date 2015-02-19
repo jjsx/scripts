@@ -73,11 +73,9 @@ while [ $dm == 0 ] ; do
 done
 
 echo "Enter the full path of the firmware file to flash:"
-echo "(NOTE: There is no validation on the file)"
 read fw_file
 while [ ! -e $fw_file ]; do
 	echo "Enter the full path of the firmware file to flash:"
-	echo "(NOTE: There is no validation on the file)"
 	read fw_file
 done
 
