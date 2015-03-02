@@ -38,18 +38,39 @@ nc='\e[0;39m'
 
 # scp
 # boost.support.simech.com is hosted on brz/frs nexentastor appliances
-server="boost.support.simech.com"
+server="10.21.1.8"
 rdir="/volumes/pool0/support/HDD_Logs/"
 
+#work dir
+workdir="/tmp/htx/$$"
+mkdir -p $workdir
+
+#log=
+log="$workdir/htx.log"
+
 error_bail () {
-	echo "$1 somehow failed. Check htx.log.";
+	echo "$1 somehow failed. Check $log";
+}
+
+clearlastline() {
+        tput cuu 1 && tput el
+}
+
+countdown () {
+secs=$1
+while [ $secs -gt 0 ]; do
+   echo "${2:-} $secs seconds"
+   sleep 1
+   clearlastline
+   : $((secs--))
+done
 }
 
 ctrl_c() {
 	# kill SMART tests if script is exited
 	for i in "${devices[@]}"; do
 		hdd_data
-		smartctl -X /dev/$i &> htx.log
+		smartctl -X /dev/$i &> $log
 	done
 	echo
 	echo "Script terminated early. Test(s) canceled."
@@ -58,11 +79,10 @@ ctrl_c() {
 }
 
 cleanup () {
-	#rm sd*.bb &> /dev/null
-	#rm *-badblocks.txt &> /dev/null
-	#rm *-SMART.txt &> /dev/null
-	#rm *-bb.tmp 
-echo ""
+	rm -rf $workdir/sd*.bb &> /dev/null
+	rm -rf $workdir/*-badblocks.txt &> /dev/null
+	rm -rf $workdir/*-SMART.txt &> /dev/null
+	rm -rf $workdir/*-bb.tmp &> /dev/null
 }
 
 test_status () {
@@ -83,10 +103,13 @@ fi
 
 hdd_data () {
 		# figure out serial
-		serial=(`sginfo -s /dev/$i | grep "Serial" | cut -c 15- | grep [a-zA-Z0-9] | tr -d "'"`)
+		serial=(`sginfo -s /dev/$i | awk '/Serial Number/ {print $4}' | sed "s/'/ /g"`)
 		# figure out model
-		model=`sginfo /dev/$i | grep "Product" | cut -c 9- |sed -e 's/^ *//' -e 's/ *$//'`
+		model=`sginfo -i /dev/$i | awk '/Product:/ {print $2}'`
 		# figure out enclosure/slot
+		# something something something
+		# firmware rev
+		firmware=(`sginfo -i /dev/$i | awk '/Revision level/ {print $3}'`)
 
 }
 
@@ -111,11 +134,13 @@ done
 exit 1
 }
 
+
+
 locate_data () {
 	# $1 = serial $2 = on/off
 	enclosure=(`sas2ircu 0 DISPLAY | grep -B 8 "${1}" | awk '/Enclosure #.*:.*[0-9]/ {print $4}'`)
 	slot=(`sas2ircu 0 DISPLAY | grep -B 8 "${1}" | awk '/Slot #.*:.*[0-9]/ {print $4}'`)
-	sas2ircu 0 locate $enclosure:$slot $2 &> htx.log
+	sas2ircu 0 locate $enclosure:$slot $2 &> $workdir
 }
 
 verify () {
@@ -149,6 +174,7 @@ dev_info () {
 	echo "Device: /dev/$i"
 	echo "Model: $model"
 	echo "Serial: $serial"
+	echo "Firmware: $firmware"
 }
 
 list_hdd () {
@@ -187,10 +213,16 @@ for i in "${devices[@]}"; do
 done
 }
 
+performance_results() {
+for i in "${devices[@]}"; do
+	hdd_data
+done
+}
+
 badblocks_health () {
 for i in "${devices[@]}"; do
 	hdd_data
-		if [ -s ${serial}-badblocks.txt ]; then
+		if [ -s $workdir/${serial}-badblocks.txt ]; then
 			echo
 			dev_info
 			echo -e "Badblocks test: ${red}FAILED!${nc} Check log file."
@@ -222,27 +254,31 @@ usage () {
 	echo
 	echo "-s       SMART test"
 	echo "-b       Badblocks test"
+	echo "-p       Performance test"
 	echo
-	echo "Example: htx -s -d 'sdb sdc'"
+	echo "Example: htx -s -b -p -d 'sdb sdc'"
 	echo
 	exit
 }
 
 
 # read script opts
-while getopts "aslbd:f:" options; do
+while getopts "aslbpd:f:" options; do
   case $options in
 a)
 	a=1
 	d=0
-	devices=(`lsblk |awk '/^sd./' |grep -o sd[b-z]`)
+	devices=(`lsblk | grep -vE '465.8G|^--$' | awk '/^sd.*/ {print $1}'`)
 ;;
 s)
 	s=1
 ;;
+p)
+	p=1
+;;
 l)
 	l=1
-	devices=(`lsblk |awk '/^sd./' |grep -o sd[b-z]`)
+	devices=(`lsblk | grep -vE '465.8G|^--$' | awk '/^sd.*/ {print $1}'`)
 ;;
 b)
 	b=1
@@ -317,7 +353,7 @@ if [ "$s" == "1" ]; then
 
 	# begin smart checks
 		for i in "${devices[@]}"; do
-			smartctl -t short /dev/$i &> htx.log
+			smartctl -t short /dev/$i &> $log
 		done
 		echo "SMART test(s) started on: ${devices[@]}"
 		echo "Please wait..."
@@ -336,13 +372,13 @@ if [ "$s" == "1" ]; then
 	# ship smart data
 	for i in "${devices[@]}"; do
 		hdd_data
-	        smartctl -a /dev/$i > ${serial}-SMART.txt
+	        smartctl -a /dev/$i > $workdir/${serial}-SMART.txt
 	        ssh $server "mkdir -p /volumes/pool0/support/HDD_Logs/$serial"
-	        scp "${serial}-SMART.txt" "$server:$rdir$serial" &> htx.log
+	        scp "$workdir/${serial}-SMART.txt" "$server:$rdir$serial" &> $log
 	        if [ $? != 0 ]; then
 				error_bail "Transferring SMART log(s)"
 			fi
-	        rm ${serial}-SMART.txt &> htx.log
+	        rm $workdir/${serial}-SMART.txt &> $log
 	done
 echo "SMART data transferred to storage."
 fi
@@ -350,30 +386,30 @@ fi
 if [ "$b" == "1" ]; then
 	for i in "${devices[@]}"; do
 	hdd_data
-	badblocks -v -o ${serial}-badblocks.txt /dev/$i &> $i-bb.tmp &
+	badblocks -b 4096 -c 300000 -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
 	bb_pid=$!
 	pid_array+=($bb_pid)
-	echo $bb_pid > $i-pid-bb.tmp
+	echo $bb_pid > $workdir/$i-pid-bb.tmp
 	done
 	echo "Badblock test(s) started on: ${devices[@]}"
 	declare -A a_devices
 	#a_devices="${devices[@]}"
-		while ps -p ${pid_array[@]} > /dev/null; do
-			for i in "${devices[@]}"; do
-				bbp=("`cat $i-bb.tmp |grep -oh ".[0-9]..[0-9]%.*errors)" |sort -n|tail -1`")
-				a_devices[$i]="$bbp"
-				#echo -ne " /dev/$i $bbp"\\r
+	#cat $workdir/$i-bb.tmp |grep -oh ".[0-9]..[0-9]%.*errors)" |sort -n|tail -1
+		while ps -p ${pid_array[@]} > /dev/null; do # while a pid exists that badblocks created
+			for i in "${devices[@]}"; do # this container checks the file and updates below var to the current % done elapsed and error count
+				bbp=("`cat $workdir/$i-bb.tmp |grep -oh ".[0-9]..[0-9]%.*errors)" |sort -n|tail -1`") # assigns % done, elapsed, and error count to var
+				a_devices[$i]="$bbp" # adds each device we are testing to "a_devices" var array
 			done
-			for i in "${!a_devices[@]}"; do
-				#echo "key  : $i"
-				#echo "value: ${a_devices[$i]}"
-				pid=(`cat $i-pid-bb.tmp`)
-				if ps -p $pid > /dev/null; then
-				echo -n -e " /dev/$i ${a_devices[$i]}\r"
-				#printf "/dev" "$i" "${a_devices[$i]}"\r
-				#printf "/dev/%s %s" $i ${a_devices[$i]}
+			for i in "${!a_devices[@]}"; do # for each item in array
+				pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
+				if ps -p $pid > /dev/null; then # if badblocks pid exists
+					echo "/dev/$i ${a_devices[$i]}" # echo device current status
 				fi
-				sleep 1
+			done 
+			countdown 30 "Refreshing in" # refresh display every 30 seconds
+			for i in "${!a_devices[@]}"; do # clean screen
+				tput cuu1 # move mouse up 1 line
+				tput el # delete line
 			done
 		done
 
@@ -384,13 +420,33 @@ if [ "$b" == "1" ]; then
 	for i in "${devices[@]}"; do
 		hdd_data
 	        ssh $server "mkdir -p $rdir$serial"
-	        scp "${serial}-badblocks.txt" "$server:$rdir$serial" &> htx.log
+	        scp "$workdir/${serial}-badblocks.txt" "$server:$rdir$serial" &> $log
 			if [ $? != 0 ]; then
 				error_bail "Transferring badblocks log(s)"
 			fi
-			rm ${serial}-badblocks.txt &> htx.log
+			rm $workdir/${serial}-badblocks.txt &> $log
 	done
 			echo "Badblocks data transferred to storage."
 	fi
+
+perf_test () {
+echo "Performance test(s) started on: ${devices[@]}"
+echo "Please wait..."
+for i in "${devices[@]}"; do
+	hdd_data
+	hide="if"
+	write_speed=$(dd ${hide}=/dev/${i} of=testfile bs=1M count=256 oflag=dsync 2>&1 | awk '/bytes/ {print $8, $9}')
+	read_speed=$(dd ${hide}=testfile of=/dev/${i} bs=1M count=256 oflag=dsync 2>&1 | awk '/bytes/ {print $8, $9}')
+	dev_info
+	echo "Write Speed: ${green}${write_speed}${nc}"
+	echo "Read Speed: ${green}${read_speed}${nc}"
+	echo ""
+done
+}
+
+# performance test if -p
+if [ "$p" == "1" ]; then
+	perf_test
+fi
 
 cleanup

@@ -2,19 +2,15 @@
 # Silicon Mechanics Lumberjack
 # It gathers the logs!
 # Filename: sm-lumberjack.sh
-# Copyright (c) 2014 Silicon Mechanics, Inc.
-
-# !!! DO NOT EDIT THIS SCRIPT WITHOUT PERMISSION FROM SILICON MECHANICS SUPPORT. IMPROPER EDITING MAY CAUSE IRREVERSIBLE DAMAGE. !!!
 
 # This script collects log, files, and command output for diagnostics and issue resolution.
 
-# Version Date: 12/09/14
-version="1.3.1"
+# Version Date: 3/2/15
+version="1.3.3"
 
 script="sm-lumberjack"
 
-printf "Silicon Mechanics Lumberjack (sm-lumberjack) ${version}\nThis script collects logs, files, and command output for diagnostics.\nSupported on: RHEL, CentOS, Scientific Linux, Ubuntu, Debian, OpenSUSE\n"
-sleep 3
+printf "Silicon Mechanics Lumberjack (sm-lumberjack) ${version}\nThis script collects logs, files, and command output for diagnostics.\nSupported on: RHEL 6/7, CentOS 5-7, Scientific Linux 6/7, Ubuntu 10-14, Debian 6/7, SUSE 12/13\n"
 
 # Check OS
 OS=$(uname -s)
@@ -29,35 +25,40 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+confirm () {
+    read -r -p "${1:-Continue? [y/N]} " response
+    case $response in
+        [yY][eE][sS]|[yY]) 
+            true
+            return 0
+            ;;
+        *)
+            false
+            ${2:-exit}
+            return 1
+            ;;
+    esac
+}
+confirm
 
-# Set OS variable
-os="unknown"
-if [[ `uname -a | grep Ubuntu` ]]; then
-	os=ubuntu
-elif [[ `uname -a | grep Linux` ]]; then
-	os=linux
-fi
+timer()
+{
+    if [[ $# -eq 0 ]]; then
+        echo $(date '+%s')
+    else
+        local  stime=$1
+        etime=$(date '+%s')
 
-if [[ `cat /etc/issue | grep -i openSUSE` ]]; then
-	os=opensuse
-fi
+        if [[ -z "$stime" ]]; then stime=$etime; fi
 
-if [[ `cat /etc/issue | grep -i Debian` ]]; then
-	os=debian
-fi
-
-if [[ "$os" == "linux" ]]; then
-	pkgmgr=yum
-elif [[ "$os" == "opensuse" ]]; then
-	pkgmgr=zypper
-elif [[ "$os" == "ubuntu" ]]; then
-	pkgmgr=apt-get
-elif [[ "$os" == "debian" ]]; then
-	pkgmgr=apt-get
-fi
-
-printf "Starting...\n"	
-sleep 2
+        dt=$((etime - stime))
+        ds=$((dt % 60))
+        dm=$(((dt / 60) % 60))
+        dh=$((dt / 3600))
+        printf '%d:%02d:%02d' $dh $dm $ds
+    fi
+}
+tmr=$(timer)
 
 # Date
 now=$(date +"%Y-%m-%d-%H-%M-%S-%Z")
@@ -83,10 +84,6 @@ scriptdir="$workdir/$script"
 # Create directories
 dirarray=($ipmidir $dmidir $diskdir $lsidir $pci_devicesdir $networkdir $nameservicesdir $osdir $systemdir $performancedir $scriptdir)
 
-
-# Log file
-log="$scriptdir/$script.log"
-
 # Create directories
 for i in "${dirarray[@]}"; do
 mkdir -p $i
@@ -95,24 +92,62 @@ done
 # Copy script into output location
 cp $script.sh $scriptdir &> /dev/null &
 
-# Function to install packages
-install () {
-	printf "\n$1 not found. Attempting to install from repository.."
-	installlog=$(echo $pkgmgr install -y $1 | tr A-Z a-z | sed -e 's/[^a-zA-Z0-9\-]/-/g')
-	$pkgmgr install -y $1 1> ${dir}/${installlog}.out 2> ${dir}/${installlog}.err
-}
+# Log file
+log="$scriptdir/$script.log"
+touch $log
+
+# Start log
+exec > >(tee $log)
+exec 2>&1
+
+# Set OS variable
+os="unknown"
+if [[ `uname -a | grep Ubuntu` ]]; then
+	os=ubuntu
+elif [[ `uname -a | grep Linux` ]]; then
+	os=linux
+fi
+
+if [[ -r /etc/SuSE-release ]]; then
+	os=suse
+fi
+
+if [[ `cat /etc/issue | grep -i Debian` ]]; then
+	os=debian
+fi
+
+if [[ "$os" == "linux" ]]; then
+	pkgmgr=yum
+elif [[ "$os" == "suse" ]]; then
+	pkgmgr=zypper
+elif [[ "$os" == "ubuntu" || $"os" == "debian" ]]; then
+	pkgmgr=apt-get
+fi
+
+printf "Starting...\n"	
+sleep 2
 
 # Function to check if package install failed
 check_failed () {
 	if [ $? != 0 ]; then
 		printf "$1 install failed.."
-		printf "$1\n" >> $log
+	fi
+}
+
+# Function to install packages
+install () {
+	printf "$1 not found. This package may provide important diagnostic information.\n"
+	if confirm "Attempt to install from repository? [y/N]" "echo Skipping install.."; then
+		installlog=$(echo $pkgmgr install -y $1 | tr A-Z a-z | sed -e 's/[^a-zA-Z0-9\-]/-/g')
+		printf "Attempting to install $1..\n"
+		$pkgmgr install -y $1 1> ${dir}/${installlog}.out 2> ${dir}/${installlog}.err
+		check_failed
 	fi
 }
 
 # Simple function to log finished log gathering sections
 finished () {
-	printf " done.\n"
+	printf "\n"
 	sleep 1
 }
 
@@ -128,38 +163,18 @@ grab () {
 	cp $1 ${dir}/${grabfile} &> /dev/null
 }
 
-timer()
-{
-    if [[ $# -eq 0 ]]; then
-        echo $(date '+%s')
-    else
-        local  stime=$1
-        etime=$(date '+%s')
-
-        if [[ -z "$stime" ]]; then stime=$etime; fi
-
-        dt=$((etime - stime))
-        ds=$((dt % 60))
-        dm=$(((dt / 60) % 60))
-        dh=$((dt / 3600))
-        printf '%d:%02d:%02d' $dh $dm $ds
-    fi
-}
-tmr=$(timer)
 
 # DMI
 dir=$dmidir
 
-printf "Gathering DMI information.."
+printf "Gathering DMI information..\n"
 if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
 	if ! [[ `dpkg --get-selections | grep -v deinstall | grep dmidecode` ]]; then
 	install "dmidecode"
-	check_failed
 fi
-elif [[ "$os" == "linux"  || "$os" == "opensuse" ]]; then
+elif [[ "$os" == "linux"  || "$os" == "suse" ]]; then
 	if ! [[ `rpm -qa | grep dmidecode` ]]; then
 	install "dmidecode"
-	check_failed
 fi
 fi
 
@@ -174,17 +189,15 @@ run_cmd "dmidecode -t memory"
 run_cmd "dmidecode -t slot"
 
 # DMI finished
-finished
 
 # IPMI
 dir=$ipmidir
 
 
-printf "Gathering IPMI information.."
+printf "Gathering IPMI information..\n"
 if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
 	if ! [[ `dpkg --get-selections | grep -v deinstall |grep ipmitool` ]]; then
 		install "ipmitool"
-		check_failed
 		run_cmd "modprobe ipmi_msghandler"
 		run_cmd "modprobe ipmi_devintf"
 		run_cmd "modprobe ipmi_si"
@@ -192,14 +205,12 @@ if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
 elif [[ "$os" == "linux" ]]; then
 	if ! [ `rpm -qa | grep ipmitool` ] || ! [ `rpm -qa | grep OpenIPMI-libs` ]; then
 		install "OpenIPMI OpenIPMI-tools"
-		check_failed
 		run_cmd "chkconfig ipmi on"
 		run_cmd "service ipmi start"
 	fi
-elif [[ "$os" == "opensuse" ]]; then
+elif [[ "$os" == "suse" ]]; then
 	if ! [ `rpm -qa | grep ipmitool` ]; then
 		install "OpenIPMI OpenIPMI-tools"
-		check_failed
 	fi
 fi
 
@@ -212,21 +223,27 @@ run_cmd "ipmitool chassis status"
 run_cmd "ipmitool sensor"
 
 # IPMI finished
-finished
 
 # LSI
 dir=$lsidir
 
-printf "Gathering LSI information.."
-run_cmd "modinfo megaraid"
+
+if [[ `lspci | grep -i lsi || avago` ]]; then
+	if confirm "Gather LSI RAID information?" "echo Skipping LSI information.."; then
+		printf "Gathering LSI information..\n"
+		wget -O $lsidir/lsigetlunix.sh --no-check-certificate #lsiget.sh
+		wget -O $lsidir/all_cli --no-check-certificate #all_cli
+		chmod +x $lsidir/lsigetlunix.sh
+		$lsidir/lsigetlunix.sh -B
+	fi
+fi
 
 # LSI finished
-finished
 
 # HDD
 dir=$diskdir
 
-printf "Gathering disk information.."
+printf "Gathering disk information..\n"
 run_cmd "fdisk -l"
 run_cmd "df -Th"
 run_cmd "mount"
@@ -247,12 +264,10 @@ grab "/proc/diskstats"
 if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
 	if ! [[ `dpkg --get-selections | grep -v deinstall |grep smartmontools` ]]; then
 	install "smartmontools"
-	check_failed
 fi
-elif [[ "$os" == "linux"  || "$os" == "opensuse" ]]; then
+elif [[ "$os" == "linux"  || "$os" == "suse" ]]; then
 	if ! [[ `rpm -qa | grep smartmontools` ]]; then
 	install "smartmontools"
-	check_failed
 fi
 fi
 
@@ -265,21 +280,19 @@ for hd in $(ls /dev/sd[a-z] | sed 's/.*\///'); do
 done
 
 # HDD finished
-finished
 
 # PCI Devices
 dir=$pci_devicesdir
 
-printf "Gathering PCI device information.."
+printf "Gathering PCI device information..\n"
 run_cmd "lspci -vvv"
 
 # PCI devices finished
-finished
 
 # Network
 dir=$networkdir
 
-printf "Gathering network information.."
+printf "Gathering network information..\n"
 run_cmd "ifconfig -a"
 run_cmd "modinfo e1000"
 run_cmd "modinfo ixgbe"
@@ -296,23 +309,21 @@ elif [[ "$os" == "linux" ]]; then
 fi
 
 # Network finished
-finished
 
 # Name Services
 dir=$nameservicesdir
 
-printf "Gathering name service information.."
+printf "Gathering name service information..\n"
 
 grab "/etc/resolv.conf"
 grab "/etc/nsswitch.conf"
 
 # Name Services finished
-finished
 
 # Operating System
 dir=$osdir
 
-printf "Gathering OS information.."
+printf "Gathering OS information..\n"
 run_cmd "uname -a"
 run_cmd "ps aux"
 run_cmd "whoami"
@@ -328,7 +339,7 @@ grab "/etc/rsyslog.conf"
 # Gather kernel logs
 if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
 	for i in $(ls /var/log/syslog* |sed 's/.*\///'); do cp /var/log/$i $osdir/$i; done
-elif [[ "$os" == "linux"  || "$os" == "opensuse" ]]; then
+elif [[ "$os" == "linux"  || "$os" == "suse" ]]; then
 	for i in $(ls /var/log/messages* |sed 's/.*\///'); do cp /var/log/$i $osdir/$i; done
 fi
 
@@ -336,12 +347,11 @@ grab "/var/log/dmesg"
 grab "/etc/ntp.conf"
 
 # Operating System finished
-finished
 
 # System
 dir=$systemdir
 
-printf "Gathering system hardware information.."
+printf "Gathering system hardware information..\n"
 run_cmd "free -g"
 run_cmd "lscpu"
 run_cmd "nproc"
@@ -361,12 +371,10 @@ fi
 if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
 	if ! [[ `dpkg --get-selections | grep -v deinstall | grep mcelog` ]]; then
 	install "mcelog"
-	check_failed
 fi
-elif [[ "$os" == "linux"  || "$os" == "opensuse" ]]; then
+elif [[ "$os" == "linux"  || "$os" == "suse" ]]; then
 	if ! [[ `rpm -qa | grep mcelog` ]]; then
 	install "mcelog"
-	check_failed
 fi
 fi
 
@@ -374,7 +382,6 @@ grab "/etc/mcelog/mcelog.conf"
 grab "/var/log/mcelog"
 
 # System finished
-finished
 
 # Performance
 dir=$performancedir
@@ -382,7 +389,7 @@ dir=$performancedir
 # Wait for commands to finish
 printf "Finishing up.."
 wait
-
+printf "\n"
 # Generate statistic file
 
 stats_file="$scriptdir/$script.stats"
@@ -413,7 +420,7 @@ dimmcount=$(cat $dmidir/dmidecode--t-memory.out | awk '/Size: [0-9]/' | wc -l)
 totalram=$(cat $dmidir/dmidecode--t-memory.out | awk '/Size: [0-9]/ {print $2}' | head -1)
 printf "RAM Information:\n" >> $stats_file
 printf "$dimmcount x $totalram MB\n\n" >> $stats_file
-printf "Populated Slots:\n" >> $stats_file
+printf "Populated DIMM Slots:\n" >> $stats_file
 cat $dmidir/dmidecode--t-memory.out |grep -A 3 "Size: [0-9]" |awk '/Locator/ {print $2}' >> $stats_file
 printf "\n" >> $stats_file
 
@@ -453,16 +460,14 @@ else
 fi
 
 # Generate .tar.gz file
-tar -czf $script-$hostname-$now.tar.gz $workdir &> $log
+tar -czf $script-$hostname-$now.tar.gz -C /$workdir .
 if [ $? != 0 ]; then
-	printf "Could not create tar.gz output file. Please e-mail support the 'sm-lumberjack.log' file located in the current directory."
+	printf "Could not create tar.gz output file. Please e-mail support the '$script.log' file located in the current directory.\n"
 	cp "$log" .
 fi
 
 
-if [[ `ls ${script}-${hostname}-${now}.tar.gz` ]]; then
-	finished
-	sleep 1
+if [[ -f ${script}-${hostname}-${now}.tar.gz ]]; then
 	printf "Output file: ${script}-${hostname}-${now}.tar.gz\n"
 fi
 
