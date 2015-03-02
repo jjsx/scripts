@@ -448,7 +448,7 @@ WaitQuit () {
 # Verify all capture script files exist or exit.
 ###########################################################################################################################
 
-for i in Readme.txt all_cli ; do
+for i in all_cli ; do
 	if [ ! -f $i ] ; then echo "$i missing"
 
 		#cho ".................................................||................................................."
@@ -457,10 +457,7 @@ for i in Readme.txt all_cli ; do
 		echo "" 
 		echo "This is not a valid lsigetlunix.sh installation. This script is available at;"
 		echo "" 
-		echo "http://mycusthelp.info/LSI/_cs/AnswerDetail.aspx?inc=8264"
-		echo "" 
-		echo "All files included in the original lsigetlunix_xxx_xxxxxx.tgz file MUST be kept"
-		echo "in the same subdir as lsigetlunix.sh."
+		echo "all_cli is missing."
 		echo "" 
 		echo "" 
 		if [ "$VMWARE_SUPPORTED" != "YES" ] ; then

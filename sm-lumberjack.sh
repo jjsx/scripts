@@ -8,7 +8,9 @@
 # Version Date: 3/2/15
 version="1.3.3"
 
+# Script
 script="sm-lumberjack"
+script_location=$(echo "$PWD")
 
 printf "Silicon Mechanics Lumberjack (sm-lumberjack) ${version}\nThis script collects logs, files, and command output for diagnostics.\nSupported on: RHEL 6/7, CentOS 5-7, Scientific Linux 6/7, Ubuntu 10-14, Debian 6/7, SUSE 12/13\n"
 
@@ -67,6 +69,8 @@ hostname=`hostname`
 
 # Working directory
 workdir="/tmp/sm-lumberjack"
+
+
 
 # Output directories
 ipmidir="$workdir/ipmi"
@@ -228,15 +232,17 @@ run_cmd "ipmitool sensor"
 dir=$lsidir
 
 
-if [[ `lspci | grep -i lsi || avago` ]]; then
-	if confirm "Gather LSI RAID information?" "echo Skipping LSI information.."; then
+#if [[ `lspci | grep -i LSI` ]]; then
+	if confirm "Gather LSI RAID information? [y/N]" "echo Skipping LSI information.."; then
 		printf "Gathering LSI information..\n"
-		wget -O $lsidir/lsigetlunix.sh --no-check-certificate #lsiget.sh
-		wget -O $lsidir/all_cli --no-check-certificate #all_cli
-		chmod +x $lsidir/lsigetlunix.sh
-		$lsidir/lsigetlunix.sh -B
+		run_cmd "wget -O $lsidir/lsigetlunix.sh --no-check-certificate https://raw.githubusercontent.com/jjsx/scripts/master/lsiget062514/lsigetlunix.sh" #lsiget.sh
+		run_cmd "wget -O $lsidir/all_cli --no-check-certificate https://github.com/jjsx/scripts/raw/master/lsiget062514/all_cli" #all_cli
+		run_cmd "chmod +x $lsidir/lsigetlunix.sh"
+		cd $lsidir
+		run_cmd "$lsidir/lsigetlunix.sh -B"
+		cd $script_location
 	fi
-fi
+#fi
 
 # LSI finished
 
