@@ -6,7 +6,8 @@
 #       \___ \|  Y Y  \ /_____/ |  |_|  |  /  Y Y  \ \_\ \  ___/|  | \/|  |/ __ \\  \___|    < 		  
 #      /____  >__|_|  /         |____/____/|__|_|  /___  /\___  >__/\__|  (____  /\___  >__|_ \		  
 #           \/      \/                           \/    \/     \/   \______|    \/     \/     \/       
-#																				It gathers the logs!
+#										It gathers the logs!										  
+#	
 
 # sm-lumberjack.sh
 # Silicon Mechanics Lumberjack <sm-lumberjack>
