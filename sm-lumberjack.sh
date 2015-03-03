@@ -1,16 +1,82 @@
 #!/bin/bash
-# Silicon Mechanics Lumberjack
-# It gathers the logs!
-# Filename: sm-lumberjack.sh
+
+#                               .__               ___.                  __               __    		  
+#        ______ _____           |  |  __ __  _____\_ |__   ___________ |__|____    ____ |  | __   	  
+#       /  ___//     \   ______ |  | |  |  \/     \| __ \_/ __ \_  __ \|  \__  \ _/ ___\|  |/ /		  
+#       \___ \|  Y Y  \ /_____/ |  |_|  |  /  Y Y  \ \_\ \  ___/|  | \/|  |/ __ \\  \___|    < 		  
+#      /____  >__|_|  /         |____/____/|__|_|  /___  /\___  >__/\__|  (____  /\___  >__|_ \		  
+#           \/      \/                           \/    \/     \/   \______|    \/     \/     \/       
+#										It gathers the logs!										  
+#	
+
+# sm-lumberjack.sh
+# Silicon Mechanics Lumberjack <sm-lumberjack>
+# Author: John Sanderson <john.sanderson@siliconmechanics.com> <https://github.com/jjsx>
+# Copyright (c) 2014-2015, Silicon Mechanics, Inc. <www.siliconmechanics.com>
 
 # This script collects log, files, and command output for diagnostics and issue resolution.
+# Supported on: RHEL 6/7, CentOS 5-7, Scientific Linux 6/7, Ubuntu 10-14, Debian 6/7, SUSE 12/13
 
-# Version Date: 3/2/15
-version="1.3.3"
+# DO NOT EDIT THIS SCRIPT WITHOUT EXPLICIT PERMISSION FROM SILICON MECHANICS SUPPORT.
+
+# Revision History:																					  
+# 2015-3-2	(1.4.0)																					  
+#			Added support for LSIget 																  
+#			Increased log verbosity 																  
+#			Added prompts for download/installs 													  
+#			Fixed support for SUSE 12/13 															  
+# 2015-1-15 (1.3.2) 																				  
+#			Improved statistic reporting 															  
+#			Minor edits to script operation															  
+# 2014-12-9 (1.3.1) 																				  
+#			Minor edits to script operation															  
+# 2014-10-9 (1.3.0)																					  
+#			Increased log verbosity																 	  
+#			Code clean up *a lot* 																	  
+#			Various bug fixes 																		  
+# 2014-9-29 (1.2.4)																					  
+#			Added statistic reporting 																  
+# 2014-7-30 (1.2.0) 																				  
+#			Added support for SUSE & Scientific Linux 												  
+# 2014-7-30 (1.1.0)																					  
+#			Added support for Ubuntu & Debian 														  
+# 2014-6-24 (1.0.0)																					  
+#			Created																					  
+
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+# DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT #
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+# DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT #
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Script
 script="sm-lumberjack"
-script_location=$(echo "$PWD")
+version="1.4.0"
+run_dir=$(echo "$PWD")
+user=$(whoami)
 
 printf "Silicon Mechanics Lumberjack (sm-lumberjack) ${version}\nThis script collects logs, files, and command output for diagnostics.\nSupported on: RHEL 6/7, CentOS 5-7, Scientific Linux 6/7, Ubuntu 10-14, Debian 6/7, SUSE 12/13\n"
 
@@ -98,7 +164,9 @@ cp $script.sh $scriptdir &> /dev/null &
 
 # Log file
 log="$scriptdir/$script.log"
+cmd_log="$scriptdir/commands_ran.log"
 touch $log
+touch $cmd_log
 
 # Start log
 exec > >(tee $log)
@@ -128,13 +196,13 @@ elif [[ "$os" == "ubuntu" || $"os" == "debian" ]]; then
 	pkgmgr=apt-get
 fi
 
-printf "Starting...\n"	
+printf "\nStarting...\n"	
 sleep 2
 
 # Function to check if package install failed
 check_failed () {
 	if [ $? != 0 ]; then
-		printf "$1 install failed.."
+		printf "$1 $2 failed.."
 	fi
 }
 
@@ -145,7 +213,7 @@ install () {
 		installlog=$(echo $pkgmgr install -y $1 | tr A-Z a-z | sed -e 's/[^a-zA-Z0-9\-]/-/g')
 		printf "Attempting to install $1..\n"
 		$pkgmgr install -y $1 1> ${dir}/${installlog}.out 2> ${dir}/${installlog}.err
-		check_failed
+		check_failed "$1" "install"
 	fi
 }
 
@@ -159,12 +227,14 @@ finished () {
 run_cmd () {
 	runlog=$(echo $1 | tr A-Z a-z | sed -e 's/[^a-zA-Z0-9\-]/-/g')
 	$1 1> ${dir}/${runlog}.out 2> ${dir}/${runlog}.err
+	echo "$now $user # $1 1> ${dir}/${runlog}.out 2> ${dir}/${runlog}.err" >> $cmd_log
 }
 
 # Function to copy files to output directory
 grab () {
 	grabfile=$(echo $1 | sed 's!.*/!!')
 	cp $1 ${dir}/${grabfile} &> /dev/null
+	echo "$now $user # cp $1 ${dir}/${grabfile} &> /dev/null" >> $cmd_log
 }
 
 
@@ -213,8 +283,17 @@ elif [[ "$os" == "linux" ]]; then
 		run_cmd "service ipmi start"
 	fi
 elif [[ "$os" == "suse" ]]; then
-	if ! [ `rpm -qa | grep ipmitool` ]; then
-		install "OpenIPMI OpenIPMI-tools"
+	if ! [ `rpm -qa | grep -i ipmitool` ]; then
+		install "ipmitool"
+		run_cmd "modprobe ipmi_msghandler"
+		run_cmd "modprobe ipmi_devintf"
+		run_cmd "modprobe ipmi_si"
+	fi
+	if ! [ `rpm -qa | grep -i OpenIPMI` ]; then
+		install "OpenIPMI"
+		run_cmd "modprobe ipmi_msghandler"
+		run_cmd "modprobe ipmi_devintf"
+		run_cmd "modprobe ipmi_si"
 	fi
 fi
 
@@ -233,15 +312,27 @@ dir=$lsidir
 
 
 #if [[ `lspci | grep -i LSI` ]]; then
-	if confirm "Gather LSI RAID information? [y/N]" "echo Skipping LSI information.."; then
-		printf "Gathering LSI information..\n"
-		run_cmd "wget -O $lsidir/lsigetlunix.sh --no-check-certificate https://raw.githubusercontent.com/jjsx/scripts/master/lsiget062514/lsigetlunix.sh" #lsiget.sh
-		run_cmd "wget -O $lsidir/all_cli --no-check-certificate https://github.com/jjsx/scripts/raw/master/lsiget062514/all_cli" #all_cli
-		run_cmd "chmod +x $lsidir/lsigetlunix.sh"
-		cd $lsidir
-		run_cmd "$lsidir/lsigetlunix.sh -B"
-		cd $script_location
+	if confirm "Gather LSI information? (requires download) [y/N]" "echo Skipping LSI information.."; then
+		printf "Gathering LSI information.. "
+		mkdir -p $lsidir/lsiget
+		printf "Attempting to download LSIget.. "
+		run_cmd "wget -O $lsidir/lsiget/lsigetlunix.sh --no-check-certificate https://raw.githubusercontent.com/jjsx/scripts/master/lsiget062514/lsigetlunix.sh 2>&1" # lsigetlunix.sh
+		check_failed "lsigetlunix.sh" "download"
+		run_cmd "wget -O $lsidir/lsiget/all_cli --no-check-certificate https://github.com/jjsx/scripts/raw/master/lsiget062514/all_cli 2>&1" # all_cli
+		check_failed "all_cli" "download"
+			if [[ -f $lsidir/lsiget/lsigetlunix.sh && -f $lsidir/lsiget/all_cli ]]; then
+				cd $lsidir/lsiget
+				printf "Running LSIget..\n"
+				chmod +x lsigetlunix.sh
+				run_cmd "./lsigetlunix.sh -B"
+				mv *.tar.gz $lsidir
+				rm -rf $lsidir/lsiget
+				cd $run_dir
+			else
+				printf "Cannot gather LSI information. Download of LSIget failed.\n"
+			fi
 	fi
+
 #fi
 
 # LSI finished
@@ -393,11 +484,10 @@ grab "/var/log/mcelog"
 dir=$performancedir
 
 # Wait for commands to finish
-printf "Finishing up.."
+printf "Finishing up..\n"
 wait
-printf "\n"
-# Generate statistic file
 
+# Generate statistic file
 stats_file="$scriptdir/$script.stats"
 
 printf "Lumberjack ($version) run stats\n" >> $stats_file
@@ -449,33 +539,30 @@ else
 	printf "No errors in EDAC.\n" >> $stats_file
 fi
 fi
-
-# Stats - Hardware Errors
-#if [[ `dmesg | grep -i "Hardware Error"` || `dmesg | grep -i "Machine Check Exception"` ]]; then
-#	printf "ERRORS in dmesg.\n" >> $stats_file
-#else
-#	printf "No errors in dmesg.\n" >> $stats_file
-#fi
-
+# Stats - mcelog errors
 if [[ -f "/var/log/mcelog" ]]; then
 	if [[ -s "/var/log/mcelog" ]]; then
-		printf "ERRORS - /var/log/mcelog.\n" >> $stats_file
+		printf "ERRORS - mcelog.\n" >> $stats_file
 	fi
 else
-	printf "No errors - /var/log/mcelog.\n" >> $stats_file
+	printf "No errors - mcelog.\n" >> $stats_file
 fi
 
 # Generate .tar.gz file
+dir=$scriptdir
+
 tar -czf $script-$hostname-$now.tar.gz -C /$workdir .
 if [ $? != 0 ]; then
-	printf "Could not create tar.gz output file. Please e-mail support the '$script.log' file located in the current directory.\n"
-	cp "$log" .
+	printf "Could not create tar.gz output file. Please manually zip and send the contents of $workdir to your support representative.\n"
+
+	exit
 fi
 
+printf "Script done.\n\n"
 
 if [[ -f ${script}-${hostname}-${now}.tar.gz ]]; then
-	printf "Output file: ${script}-${hostname}-${now}.tar.gz\n"
+	printf "Output file: ${script}-${hostname}-${now}.tar.gz\nPlease send this file to your support representative.\n"
 fi
 
 # Clean up working directory
-rm -r $workdir &> /dev/null
+rm -r $workdir
