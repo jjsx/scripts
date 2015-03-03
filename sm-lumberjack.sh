@@ -316,20 +316,20 @@ dir=$lsidir
 		printf "Gathering LSI information.. "
 		mkdir -p $lsidir/lsiget
 		printf "Attempting to download LSIget.. "
-		run_cmd "wget -O $lsidir/lsiget/lsigetlunix.sh --no-check-certificate https://raw.githubusercontent.com/jjsx/scripts/master/lsiget062514/lsigetlunix.sh 2>&1" # lsigetlunix.sh
-		check_failed "lsigetlunix.sh" "download"
-		run_cmd "wget -O $lsidir/lsiget/all_cli --no-check-certificate https://github.com/jjsx/scripts/raw/master/lsiget062514/all_cli 2>&1" # all_cli
-		check_failed "all_cli" "download"
+		failed=$(printf "Failed to download.\n")
+		lsigeturl="https://raw.githubusercontent.com/jjsx/scripts/master/lsiget/lsiget.tar.gz"
+		run_cmd "wget -O $lsidir/lsiget/lsiget.tar.gz --no-check-certificate $lsigeturl > /dev/null 2>&1 || $failed " # lsigetlunix.sh
+		tar -xf $lsidir/lsiget/lsiget.tar.gz &> /dev/null
 			if [[ -f $lsidir/lsiget/lsigetlunix.sh && -f $lsidir/lsiget/all_cli ]]; then
 				cd $lsidir/lsiget
 				printf "Running LSIget..\n"
-				chmod +x lsigetlunix.sh
-				run_cmd "./lsigetlunix.sh -B"
-				mv *.tar.gz $lsidir
-				rm -rf $lsidir/lsiget
+				chmod +x lsigetlunix.sh &> /dev/null
+				run_cmd "bash ./lsigetlunix.sh -B"
+				mv *.tar.gz $lsidir &> /dev/null
+				rm -rf $lsidir/lsiget &> /dev/null
 				cd $run_dir
 			else
-				printf "Cannot gather LSI information. Download of LSIget failed.\n"
+				printf "Couldn't gather LSI data due to download or run error.\n"
 			fi
 	fi
 

@@ -79,10 +79,7 @@ ctrl_c() {
 }
 
 cleanup () {
-	rm -rf $workdir/sd*.bb &> /dev/null
-	rm -rf $workdir/*-badblocks.txt &> /dev/null
-	rm -rf $workdir/*-SMART.txt &> /dev/null
-	rm -rf $workdir/*-bb.tmp &> /dev/null
+	rm -rf $workdir &> /dev/null
 }
 
 test_status () {
@@ -102,19 +99,19 @@ fi
 }
 
 hdd_data () {
-		# figure out serial
-		serial=(`sginfo -s /dev/$i | awk '/Serial Number/ {print $4}' | sed "s/'/ /g"`)
-		# figure out model
-		model=`sginfo -i /dev/$i | awk '/Product:/ {print $2}'`
-		# figure out enclosure/slot
-		# something something something
-		# firmware rev
-		firmware=(`sginfo -i /dev/$i | awk '/Revision level/ {print $3}'`)
+	# figure out serial
+	serial=(`sginfo -s /dev/$i | awk '/Serial Number/ {print $4}' | sed "s/'/ /g"`)
+	# figure out model
+	model=`sginfo -i /dev/$i | awk '/Product:/ {print $2}'`
+	# figure out enclosure/slot
+	# something something something
+	# firmware rev
+	firmware=(`sginfo -i /dev/$i | awk '/Revision level/ {print $3}'`)
 
 }
 
 locate () {
-	for i in "${devices[@]}"; do
+for i in "${devices[@]}"; do
 	hdd_data
 	echo "Do you want to turn blink on or off for /dev/$i? (on/off)"
 	read onoff
@@ -126,10 +123,10 @@ locate () {
 	else
 		echo "Blink turned OFF for /dev/$i."
 	fi
-else
-	echo 'Invalid entry. Please specify "on", or "off"'
-	exit 1
-fi
+	else
+		echo 'Invalid entry. Please specify "on", or "off"'
+		exit 1
+	fi
 done
 exit 1
 }
@@ -213,12 +210,6 @@ for i in "${devices[@]}"; do
 done
 }
 
-performance_results() {
-for i in "${devices[@]}"; do
-	hdd_data
-done
-}
-
 badblocks_health () {
 for i in "${devices[@]}"; do
 	hdd_data
@@ -238,7 +229,7 @@ smart_errors () {
 errors=(`smartctl -l error /dev/$i | awk '/Non-medium error count/ {print $4}' | bc`)
 if [[ $errors -gt 500 ]]; then
 	echo -e "${red}Drive Non-medium error count is high: $errors ${nc}"
-	echo -e "${red}RMA Drive.${nc}"
+	echo -e "${red}If this is a Seagate drive, RMA it. Otherwise, ignore.${nc}"
 fi
 }
 
@@ -380,7 +371,7 @@ if [ "$s" == "1" ]; then
 			fi
 	        rm $workdir/${serial}-SMART.txt &> $log
 	done
-echo "SMART data transferred to storage."
+	echo "SMART data transferred to storage."
 fi
 
 if [ "$b" == "1" ]; then
@@ -427,26 +418,55 @@ if [ "$b" == "1" ]; then
 			rm $workdir/${serial}-badblocks.txt &> $log
 	done
 			echo "Badblocks data transferred to storage."
-	fi
+fi
 
-perf_test () {
-echo "Performance test(s) started on: ${devices[@]}"
-echo "Please wait..."
+
+perf_results () {
 for i in "${devices[@]}"; do
 	hdd_data
-	hide="if"
-	write_speed=$(dd ${hide}=/dev/${i} of=testfile bs=1M count=256 oflag=dsync 2>&1 | awk '/bytes/ {print $8, $9}')
-	read_speed=$(dd ${hide}=testfile of=/dev/${i} bs=1M count=256 oflag=dsync 2>&1 | awk '/bytes/ {print $8, $9}')
+	echo
 	dev_info
-	echo "Write Speed: ${green}${write_speed}${nc}"
-	echo "Read Speed: ${green}${read_speed}${nc}"
-	echo ""
+	ws=$(cat $workdir/$i-pt-w.out | awk '/bytes/ {print $8, $9}')
+	rs=$(cat $workdir/$i-pt-r.out | awk '/bytes/ {print $8, $9}')
+	echo -e "Write Speed: ${green}${ws}${nc}"
+	echo -e "Read Speed: ${green}${rs}${nc}"
+	echo
 done
 }
 
 # performance test if -p
 if [ "$p" == "1" ]; then
-	perf_test
+	echo "[BETA] Performance test(s) started on: ${devices[@]}"
+	echo "Please wait..."
+	for i in "${devices[@]}"; do
+		hdd_data
+		hide="if"
+		dd ${hide}=/dev/$i of=$workdir/${i}_testfile bs=1M count=100 oflag=dsync &> $workdir/$i-pt-w.out &
+		#echo "dd ${hide}=/dev/$i of=$workdir/$i_testfile bs=1M count=256 oflag=dsync &> $workdir/$i-pt-w.out"
+		ptw_pid=$!
+		ptw_pid_array+=($ptw_pid)
+	done
+	wait
+	for i in "${devices[@]}"; do
+		dd ${hide}=$workdir/${i}_testfile of=/dev/$i bs=1M count=100 oflag=dsync &> $workdir/$i-pt-r.out &
+		#echo "dd ${hide}=/usr/bin/pt_testfile of=/dev/$i bs=1M count=256 oflag=dsync &> $workdir/$i-pt-r.out"
+		ptr_pid=$!
+		ptr_pid_array+=($ptr_pid)
+		echo $ptw_pid > $workdir/$i-pt-w.pid
+		echo $ptr_pid > $workdir/$i-pw-r.pid
+	done
+	wait
+	#echo "PTW ARRAY"
+	#echo ${ptw_pid_array[@]}
+	#echo "PTR ARRAY"
+	#echo ${ptr_pid_array[@]}
+	#echo "PT READ"
+	#ps -p ${ptr_pid_array[@]}
+	#echo "PT WRITE"
+	#ps -p ${ptw_pid_array[@]}
+
+	echo "Performance test(s) finished."
+	perf_results
 fi
 
 cleanup
