@@ -85,6 +85,11 @@ run_cmd () {
 	$1 1> ${dir}/${runlog}.out 2> ${dir}/${runlog}.err
 }
 
+run_cmd_mdb () {
+	runlog=$(echo $1 | tr A-Z a-z | sed -e 's/[^a-zA-Z0-9\-]/-/g')
+	echo $1 | mdb -k 1> ${dir}/${runlog}.out 2> ${dir}/${runlog}.err
+}
+
 # Function to copy files to output directory
 grab () {
 	grabfile=$(echo $1 | sed 's!.*/!!')
@@ -121,13 +126,13 @@ dir=$comstardir
 
 printf "Gathering iSCSI/comstar information.."
 
-run_cmd "echo '*stmf_trace_buf/s' | mdb -k"
-run_cmd "echo 'stmf_cur_ntasks/D' | mdb -k"
-run_cmd "echo 'stmf_nworkers_cur/D' | mdb -k"
-run_cmd "echo '::iscsi_tgt -acgstbS' | mdb -k"
+run_cmd_mdb '*stmf_trace_buf/s'
+run_cmd_mdb 'stmf_cur_ntasks/D'
+run_cmd_mdb 'stmf_nworkers_cur/D'
+run_cmd_mdb '::iscsi_tgt -acgstbS'
 run_cmd "sbdadm list-lu"
-run_cmd "echo '::iscsi_tpg -R' | mdb -k"
-run_cmd "echo '::iscsi_conn -av' | mdb -k"
+run_cmd_mdb '::iscsi_tpg -R'
+run_cmd_mdb '::iscsi_conn -av'
 run_cmd "itadm list-initiator -v"
 run_cmd "itadm list-target -v"
 run_cmd "itadm list-tpg -v"
@@ -156,7 +161,7 @@ printf "Gathering disk information.."
 # cleanup old/dangling device links
 run_cmd "devfsadm -Cv"
 
-run_cmd "echo ::mptsas -t | mdb -k"
+run_cmd_mdb '::mptsas -t'
 run_cmd "cfgadm -alo show_SCSI_LUN"
 run_cmd "cfgadm -alv"
 run_cmd "iostat -En"
@@ -187,8 +192,8 @@ dir=$hbasdir
 printf "Gathering HBA information.."
 
 run_cmd "sas2ircu LIST"
-run_cmd "echo '::fcptrace' | mdb -k"
-run_cmd "echo '::fptrace' | mdb -k"
+run_cmd_mdb '::fcptrace'
+run_cmd_mdb '::fptrace'
 run_cmd "fcadm hba-port -l"
 run_cmd "fcinfo hba-port -e"
 run_cmd "fcinfo hba-port -i"
@@ -302,13 +307,13 @@ dir=$kerneldir
 printf "Gathering kernel information.."
 
 run_cmd "kstat -p -Td 10 6" &
-run_cmd "echo ::kmastat -m | mdb -k"
-run_cmd "echo ::kmem_slabs | mdb -k"
-run_cmd "echo kmem_flags/X | mdb -k"
+run_cmd_mdb '::kmastat -m'
+run_cmd_mdb '::kmem_slabs'
+run_cmd_mdb 'kmem_flags/X'
 run_cmd "ls -la $(dumpadm | grep 'Savecore directory:' | cut -d' ' -f3)"
-run_cmd "echo '::system' | mdb -k"
-run_cmd "echo ::interrupts -d | mdb -k"
-run_cmd "echo ::memstat | mdb -k | tail -n2"
+run_cmd_mdb '::system'
+run_cmd_mdb '::interrupts -d'
+run_cmd_mdb '::memstat'
 
 grab "/etc/dumpadm.conf"
 grab "/etc/system"
@@ -436,10 +441,10 @@ dir=$zfsdir
 printf "Gathering ZFS information.."
 
 run_cmd "kstat -n arcstats"
-run_cmd "echo ::zfs_params | mdb -k"
-run_cmd "echo metaslab_min_alloc_size/D | mdb -k "
-run_cmd "echo ::spa -c | mdb -k"
-run_cmd "echo ::arc | mdb -k"
+run_cmd_mdb '::zfs_params'
+run_cmd_mdb 'metaslab_min_alloc_size/D'
+run_cmd_mdb '::spa -c'
+run_cmd_mdb '::arc'
 run_cmd "zdb -C"
 # run_cmd "zdb -l /dev/dsk/*s0"
 run_cmd "zpool get cachefile | nawk 'NR > 1 {print $3}' | egrep -v '^-$' | xargs -n 1 zdb -C"
@@ -455,7 +460,7 @@ run_cmd "fsstat -f -Td zfs 1 60" &
 run_cmd "fsstat -i -Td zfs 1 60" &
 run_cmd "fsstat -n -Td zfs 1 60" &
 run_cmd "fsstat -v -Td zfs 1 60" &
-run_cmd "echo '::stacks -m zfs' | mdb -k"
+run_cmd_mdb '::stacks -m zfs'
 
 # zfs finished
 finished
