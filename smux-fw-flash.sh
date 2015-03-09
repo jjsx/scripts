@@ -7,7 +7,6 @@ log="$script-$hostname-$now.log"
 
 # author: john sanderson
 # https://github.com/jjsx
-# johnxsanderson@gmail.com
 # date: 2/14/15
 # this script is to be used to hdd firmware on nexenta/solaris using smartmon-ux
 # smux-fw-flash.sh
@@ -48,12 +47,16 @@ confirm
 
 smux="/usr/bin/smartmon-ux"
 
+
 while [ ! -e $smux ]; do
 	echo "smartmon-ux not found in $smux"
 	echo "Enter location of smartmon-ux:"
 	echo "(include '.' if current directory, i.e. './smartmon-ux', otherwise ex. '/path/to/smartmon-ux'"
 	read smux
 done
+
+printf "Running device cleanup..\n"
+devfsadm -C
 
 hdd_models=(`iostat -En | sed -n 's/^.*Product//p' | awk '{print $2}' | sort | uniq`)
 dm=0
@@ -70,24 +73,20 @@ while [ $dm == 0 ] ; do
 done
 
 echo "Enter the full path of the firmware file to flash:"
-echo "(NOTE: There is no validation on the file)"
 read fw_file
 while [ ! -e $fw_file ]; do
 	echo "Enter the full path of the firmware file to flash:"
-	echo "(NOTE: There is no validation on the file)"
 	read fw_file
 done
 
-if [ ! $3 ]; then
 echo "Enter desired firmware revision:"
 echo "(Not the same as the file name. ex. '0004')"
 read desired_fw
-fi
 
-if [ ! $4 ]; then
-echo "Enter pool name that owns the disks so they can be offlined:"
+echo "Enter pool name that owns the disks so they can be offlined (leave null if not in a pool):"
 read pool_name
-fi
+
+
 while [ ! `zpool status $pool_name | grep -i "pool: $pool_name" | awk '{print $2}'` ]; do
 	echo "Enter pool name that owns the disks so they can be offlined:"
 	read pool_name
@@ -151,8 +150,6 @@ for i in "${hdd_array[@]}"; do
 		die "onlining $i"
 		return;
 		fi
-
-		echo "Done: $i"
 		echo ""
 else
 		echo "Flashing firmware: $i"
@@ -162,6 +159,7 @@ else
 		return;
 		sleep 5
 		fi
+		echo ""
 	fi
 done
 
@@ -170,5 +168,5 @@ echo "Enabling FMD Service.."
 svcadm enable -s svc:/system/fmd:default >> $log 2>&1
 fmadm reset zfs-diagnosis >> $log 2>&1
 fmadm reset zfs-retire >> $log 2>&1
-echo "Script complete. Note that although the new firmware takes effect immediately, certain OS tools such as iostat will show the old version until a reboot."
+echo "Script complete. Note that although the new firmware takes effect immediately, certain OS tools such as 'iostat' will show the old firmware version until a reboot."
 echo "Suggestion: Run 'zpool status' and make sure all drives are online."
