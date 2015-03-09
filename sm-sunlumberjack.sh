@@ -441,7 +441,7 @@ run_cmd "echo metaslab_min_alloc_size/D | mdb -k "
 run_cmd "echo ::spa -c | mdb -k"
 run_cmd "echo ::arc | mdb -k"
 run_cmd "zdb -C"
-run_cmd "zdb -l /dev/dsk/*s0"
+# run_cmd "zdb -l /dev/dsk/*s0"
 run_cmd "zpool get cachefile | nawk 'NR > 1 {print $3}' | egrep -v '^-$' | xargs -n 1 zdb -C"
 run_cmd "zpool iostat -Td -v 1 60" &
 run_cmd "zpool history -il"
@@ -478,4 +478,3 @@ fi
 
 #cleanup
 rm -r $workdir &> /dev/null
-
