@@ -4,7 +4,8 @@
 # Author: John Sanderson
 # Email: john.sanderson@siliconmechanics.com
 # Copyright (c) 2014 Silicon Mechanics, Inc.
-# Version: v1.1-240SX
+# Version: v1.2 240SX
+# 3/16/15
 
 # !! This version is propriety for 240sx.support.simech.com
 
@@ -102,7 +103,7 @@ hdd_data () {
 	# figure out serial
 	serial=(`sginfo -s /dev/$i | awk '/Serial Number/ {print $4}' | sed "s/'/ /g"`)
 	# figure out model
-	model=`sginfo -i /dev/$i | awk '/Product:/ {print $2}'`
+	model=(`sginfo -i /dev/sdf | awk '/Product:/ {print $2,$3,$4,$5}'`)
 	# figure out enclosure/slot
 	# something something something
 	# firmware rev
