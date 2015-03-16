@@ -5,7 +5,7 @@
 # Email: john.sanderson@siliconmechanics.com
 # Copyright (c) 2014 Silicon Mechanics, Inc.
 # Version: v1.2 240SX
-# 3/16/15
+# 3/16/2015
 
 # !! This version is propriety for 240sx.support.simech.com
 
@@ -101,9 +101,9 @@ fi
 
 hdd_data () {
 	# figure out serial
-	serial=(`sginfo -s /dev/$i | awk '/Serial Number/ {print $4}' | sed "s/'/ /g"`)
+	serial=(`sginfo -s /dev/$i | grep "Serial" | cut -c 15- | grep [a-zA-Z0-9] | tr -d "'"`)
 	# figure out model
-	model=`sginfo -i /dev/sdf | awk '/Product:/ {print $2,$3,$4,$5}'`
+	model=`sginfo -i /dev/$i | awk '/Product:/ {print $2,$3,$4}'`
 	# figure out enclosure/slot
 	# something something something
 	# firmware rev
@@ -378,30 +378,39 @@ fi
 if [ "$b" == "1" ]; then
 	for i in "${devices[@]}"; do
 	hdd_data
-	badblocks -b 4096 -c 300000 -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
+	badblocks -b 4096 -c 500000 -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
 	bb_pid=$!
 	pid_array+=($bb_pid)
 	echo $bb_pid > $workdir/$i-pid-bb.tmp
 	done
 	echo "Badblock test(s) started on: ${devices[@]}"
+	sleep 10
 	declare -A a_devices
 	#a_devices="${devices[@]}"
 	#cat $workdir/$i-bb.tmp |grep -oh ".[0-9]..[0-9]%.*errors)" |sort -n|tail -1
 		while ps -p ${pid_array[@]} > /dev/null; do # while a pid exists that badblocks created
 			for i in "${devices[@]}"; do # this container checks the file and updates below var to the current % done elapsed and error count
-				bbp=("`cat $workdir/$i-bb.tmp |grep -oh ".[0-9]..[0-9]%.*errors)" |sort -n|tail -1`") # assigns % done, elapsed, and error count to var
+				bbp=$(cat $workdir/$i-bb.tmp |grep -oh ".[0-9]..[0-9]%.*errors)" |sort -n|tail -1) # assigns % done, elapsed, and error count to var
 				a_devices[$i]="$bbp" # adds each device we are testing to "a_devices" var array
 			done
+			unset count
 			for i in "${!a_devices[@]}"; do # for each item in array
-				pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
+				pid=$(cat $workdir/$i-pid-bb.tmp) # badblocks pid
 				if ps -p $pid > /dev/null; then # if badblocks pid exists
 					echo "/dev/$i ${a_devices[$i]}" # echo device current status
+					count+=($i)
 				fi
-			done 
-			countdown 30 "Refreshing in" # refresh display every 30 seconds
+			done
+			testcount=$(printf '%s\n' ${count[@]} | wc -l)
+			countdown 30 "$testcount tests in progress. Refreshing in" # refresh display every 30 seconds
+			tput cuu1
+			tpu el
 			for i in "${!a_devices[@]}"; do # clean screen
-				tput cuu1 # move mouse up 1 line
-				tput el # delete line
+				pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
+				if ps -p $pid > /dev/null; then # if badblocks pid exists
+					tput cuu1 # move mouse up 1 line
+					tput el # delete line
+				fi
 			done
 		done
 
