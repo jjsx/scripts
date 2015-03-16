@@ -103,7 +103,7 @@ hdd_data () {
 	# figure out serial
 	serial=(`sginfo -s /dev/$i | awk '/Serial Number/ {print $4}' | sed "s/'/ /g"`)
 	# figure out model
-	model=(`sginfo -i /dev/sdf | awk '/Product:/ {print $2,$3,$4,$5}'`)
+	model=`sginfo -i /dev/sdf | awk '/Product:/ {print $2,$3,$4,$5}'`
 	# figure out enclosure/slot
 	# something something something
 	# firmware rev
