@@ -377,7 +377,7 @@ fi
 
 if [ "$b" == "1" ]; then
 	ram_count="24947418" # max ram (ram in mb * 3 / 32 * 1024)
-	device_count=(`echo ${array[@]} | wc -w`)
+	device_count=(`echo ${devices[@]} | wc -w`)
 	count=$(($ram_count / $device_count))
 	for i in "${devices[@]}"; do
 	hdd_data
