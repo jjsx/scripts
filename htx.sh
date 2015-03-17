@@ -383,7 +383,7 @@ if [ "$b" == "1" ]; then
 	hdd_data
 	blocksize=$(lsblk -o NAME,PHY-SeC | grep $i | awk '{print $2}' | uniq)
 	badblocks -b $blocksize -c $count -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
-	echo "Badblocks test started on $i, using block size $blocksize and block count $count."
+	echo "Badblocks test started on /dev/$i, using block size $blocksize and block count $count."
 	bb_pid=$!
 	pid_array+=($bb_pid)
 	echo $bb_pid > $workdir/$i-pid-bb.tmp
@@ -407,13 +407,10 @@ if [ "$b" == "1" ]; then
 			done
 			testcount=$(printf '%s\n' ${count[@]} | wc -l)
 			countdown 20 "$testcount tests in progress. Refreshing in" # refresh display every 20 seconds
-			tput cuu1
-			tput el
 			for i in "${!a_devices[@]}"; do # clean screen
 				pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
 				if ps -p $pid > /dev/null; then # if badblocks pid exists
-					tput cuu1 # move mouse up 1 line
-					tput el # delete line
+					clearlastline
 				fi
 			done
 		done
