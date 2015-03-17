@@ -376,18 +376,18 @@ if [ "$s" == "1" ]; then
 fi
 
 if [ "$b" == "1" ]; then
-	ram_count="24947418" # max ram (ram in mb * 3 / 32 * 1024)
+	ram_count="4194304" # max ram (ram in mb * 3 / 32 * 1024)
 	device_count=(`echo ${devices[@]} | wc -w`)
 	count=$(($ram_count / $device_count))
 	for i in "${devices[@]}"; do
 	hdd_data
-	badblocks -b 4096 -c $count -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
+	blocksize=$(lsblk -o NAME,PHY-SeC | awk '/$i/ {print $2}' | uniq)
+	badblocks -b $blocksize -c $count -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
+	echo "Badblocks test started on $i, using block size $blocksize and block count $count."
 	bb_pid=$!
 	pid_array+=($bb_pid)
 	echo $bb_pid > $workdir/$i-pid-bb.tmp
 	done
-	echo "Badblock test(s) started on: ${devices[@]}"
-	echo "Block batch: $count"
 	sleep 10
 	declare -A a_devices
 	#a_devices="${devices[@]}"
