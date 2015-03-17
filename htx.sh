@@ -378,7 +378,7 @@ fi
 if [ "$b" == "1" ]; then
 	for i in "${devices[@]}"; do
 	hdd_data
-	badblocks -b 4096 -c 500000 -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
+	badblocks -b 4096 -c 1000000 -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
 	bb_pid=$!
 	pid_array+=($bb_pid)
 	echo $bb_pid > $workdir/$i-pid-bb.tmp
@@ -402,9 +402,9 @@ if [ "$b" == "1" ]; then
 				fi
 			done
 			testcount=$(printf '%s\n' ${count[@]} | wc -l)
-			countdown 30 "$testcount tests in progress. Refreshing in" # refresh display every 30 seconds
+			countdown 20 "$testcount tests in progress. Refreshing in" # refresh display every 20 seconds
 			tput cuu1
-			tpu el
+			tput el
 			for i in "${!a_devices[@]}"; do # clean screen
 				pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
 				if ps -p $pid > /dev/null; then # if badblocks pid exists
