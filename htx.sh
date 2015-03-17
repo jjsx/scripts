@@ -381,7 +381,7 @@ if [ "$b" == "1" ]; then
 	count=$(($ram_count / $device_count))
 	for i in "${devices[@]}"; do
 	hdd_data
-	blocksize=$(lsblk -o NAME,PHY-SeC | awk '/${i}/ {print $2}' | uniq)
+	blocksize=$(lsblk -o NAME,PHY-SeC | grep $i | awk '{print $2}' | uniq)
 	badblocks -b $blocksize -c $count -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
 	echo "Badblocks test started on $i, using block size $blocksize and block count $count."
 	bb_pid=$!
