@@ -378,7 +378,7 @@ fi
 if [ "$b" == "1" ]; then
 	for i in "${devices[@]}"; do
 	hdd_data
-	badblocks -b 4096 -c 1000000 -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
+	badblocks -b 4096 -c 500000 -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
 	bb_pid=$!
 	pid_array+=($bb_pid)
 	echo $bb_pid > $workdir/$i-pid-bb.tmp
