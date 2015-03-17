@@ -4,8 +4,6 @@
 # Author: John Sanderson
 # Email: john.sanderson@siliconmechanics.com
 # Copyright (c) 2014 Silicon Mechanics, Inc.
-# Version: v1.2 240SX
-# 3/16/2015
 
 # !! This version is propriety for 240sx.support.simech.com
 
@@ -13,6 +11,8 @@
 # sginfo
 # lsblk
 # smartctl
+
+version="1.3"
 
 if [ ! `command -v sginfo` ] || [ ! `command -v lsblk` ] || [ ! `command -v smartctl` ] || [ ! `command -v badblocks` ]; then
 	echo "Script could not locate one or more of the following:"
@@ -236,7 +236,7 @@ fi
 
 usage () {
 	echo
-	echo "HDD Tester Xtreme (HTX)"
+	echo "HDD Tester Xtreme (HTX) $version"
 	echo
 	echo "Usage:"
 	echo "-a       Run commands on all devices"
@@ -376,14 +376,18 @@ if [ "$s" == "1" ]; then
 fi
 
 if [ "$b" == "1" ]; then
+	ram_count="24947418" # max ram (ram in mb * 3 / 32 * 1024)
+	device_count=(`echo ${array[@]} | wc -w`)
+	count=$(($ram_count / $device_count))
 	for i in "${devices[@]}"; do
 	hdd_data
-	badblocks -b 4096 -c 500000 -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
+	badblocks -b 4096 -c $count -p 0 -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
 	bb_pid=$!
 	pid_array+=($bb_pid)
 	echo $bb_pid > $workdir/$i-pid-bb.tmp
 	done
 	echo "Badblock test(s) started on: ${devices[@]}"
+	echo "Block batch: $count"
 	sleep 10
 	declare -A a_devices
 	#a_devices="${devices[@]}"
