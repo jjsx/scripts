@@ -383,7 +383,7 @@ fi
 		for i in "${devices[@]}"; do
 		hdd_data
 		blocksize=$(lsblk -o NAME,PHY-SeC | grep $i | awk '{print $2}' | uniq)
-		badblocks -b $blocksize -c $count -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
+		badblocks -vs -b $blocksize -c $count -o $workdir/${serial}-badblocks.txt /dev/$i &> $workdir/$i-bb.tmp &
 		echo "Badblocks test started on /dev/$i, using block size $blocksize and block count $count."
 		bb_pid=$!
 		pid_array+=($bb_pid)
