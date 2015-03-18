@@ -398,7 +398,6 @@ if [ "$b" == "1" ]; then
 				bbp=$(cat $workdir/$i-bb.tmp |grep -oh ".[0-9]..[0-9]%.*errors)" |sort -n|tail -1) # assigns % done, elapsed, and error count to var
 				a_devices[$i]="$bbp" # adds each device we are testing to "a_devices" var array
 			done
-			unset count
 			for i in "${!a_devices[@]}"; do # for each item in array
 				pid=$(cat $workdir/$i-pid-bb.tmp) # badblocks pid
 				if ps -p $pid > /dev/null; then # if badblocks pid exists
@@ -408,13 +407,12 @@ if [ "$b" == "1" ]; then
 			done
 			testcount=$(printf '%s\n' ${count[@]} | wc -l)
 			countdown 15 "$testcount test(s) in progress. Refreshing in" # refresh display every 15 seconds
-			clear
-			#for i in "${!a_devices[@]}"; do # clean screen
-			#	pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
-			#	if ps -p $pid > /dev/null; then # if badblocks pid exists
-			#		clearlastline
-			#	fi
-			#done
+			for i in "${!a_devices[@]}"; do # clean screen
+				pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
+				if ps -p $pid > /dev/null; then # if badblocks pid exists
+					clearlastline
+				fi
+			done
 		done
 
 	echo "Badblocks test(s) finished."
