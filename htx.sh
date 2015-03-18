@@ -43,7 +43,8 @@ server="10.21.1.8"
 rdir="/volumes/pool0/support/HDD_Logs/"
 
 #work dir
-workdir="/tmp/htx/$$"
+now=$(date +"%Y-%m-%d-%H-%M-%S-%Z")
+workdir="/tmp/htx/$now"
 mkdir -p $workdir
 
 #log=
@@ -392,7 +393,7 @@ fi
 		declare -A a_devices
 		while ps -p ${pid_array[@]} > /dev/null; do # while a pid exists that badblocks created
 			for i in "${devices[@]}"; do # this container checks the file and updates below var to the current % done elapsed and error count
-				bbp=$(cat $workdir/$i-bb.tmp |grep -oh ".[0-9]..[0-9]%)" |sort -n|tail -1) # assigns % done, elapsed, and error count to var
+				bbp=$(cat $workdir/$i-bb.tmp | grep -oh ".[0-9]..[0-9]%.*elapsed") # assigns % done, elapsed, and error count to var
 				a_devices[$i]="$bbp" # adds each device we are testing to "a_devices" var array
 			done
 			unset count
