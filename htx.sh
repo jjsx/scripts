@@ -397,6 +397,7 @@ fi
 				a_devices[$i]="$bbp" # adds each device we are testing to "a_devices" var array
 			done
 			unset count
+			clear
 			for i in "${!a_devices[@]}"; do # for each item in array
 				pid=$(cat $workdir/$i-pid-bb.tmp) # badblocks pid
 				if ps -p $pid > /dev/null; then # if badblocks pid exists
@@ -406,12 +407,12 @@ fi
 			done
 			testcount=$(printf '%s\n' ${count[@]} | wc -l)
 			countdown 15 "$testcount test(s) in progress. Refreshing in" # refresh display every 15 seconds
-			for i in "${!a_devices[@]}"; do # clean screen
-				pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
-				if ps -p $pid > /dev/null; then # if badblocks pid exists
-					clearlastline
-				fi
-			done
+			#for i in "${!a_devices[@]}"; do # clean screen
+			#	pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
+			#	if ps -p $pid > /dev/null; then # if badblocks pid exists
+			#		clearlastline
+			#	fi
+			#done
 		done
 
 	echo "Badblocks test(s) finished."
@@ -438,8 +439,8 @@ for i in "${devices[@]}"; do
 	dev_info
 	ws=$(cat $workdir/$i-pt-w.out | awk '/bytes/ {print $8, $9}')
 	rs=$(cat $workdir/$i-pt-r.out | awk '/bytes/ {print $8, $9}')
-	echo -e "Write Speed: ${green}${ws}${nc}"
-	echo -e "Read Speed: ${green}${rs}${nc}"
+	echo -e "Write Speed (64k): ${green}${ws}${nc}"
+	echo -e "Read Speed (64k): ${green}${rs}${nc}"
 	echo
 done
 }
@@ -451,14 +452,14 @@ if [ "$p" == "1" ]; then
 	for i in "${devices[@]}"; do
 		hdd_data
 		hide="if"
-		dd ${hide}=/dev/$i of=$workdir/${i}_testfile bs=1M count=100 oflag=dsync &> $workdir/$i-pt-w.out &
+		dd ${hide}=/dev/$i of=$workdir/${i}_testfile bs=64k count=1024 oflag=dsync &> $workdir/$i-pt-w.out &
 		#echo "dd ${hide}=/dev/$i of=$workdir/$i_testfile bs=1M count=256 oflag=dsync &> $workdir/$i-pt-w.out"
 		ptw_pid=$!
 		ptw_pid_array+=($ptw_pid)
 	done
 	wait
 	for i in "${devices[@]}"; do
-		dd ${hide}=$workdir/${i}_testfile of=/dev/$i bs=1M count=100 oflag=dsync &> $workdir/$i-pt-r.out &
+		dd ${hide}=$workdir/${i}_testfile of=/dev/$i bs=64k count=1024 oflag=dsync &> $workdir/$i-pt-r.out &
 		#echo "dd ${hide}=/usr/bin/pt_testfile of=/dev/$i bs=1M count=256 oflag=dsync &> $workdir/$i-pt-r.out"
 		ptr_pid=$!
 		ptr_pid_array+=($ptr_pid)
