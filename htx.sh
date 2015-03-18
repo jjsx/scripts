@@ -62,7 +62,6 @@ secs=$1
 while [ $secs -gt 0 ]; do
    echo "${2:-} $secs seconds"
    sleep 1
-   clear
    : $((secs--))
 done
 }
@@ -408,6 +407,7 @@ if [ "$b" == "1" ]; then
 			done
 			testcount=$(printf '%s\n' ${count[@]} | wc -l)
 			countdown 15 "$testcount test(s) in progress. Refreshing in" # refresh display every 15 seconds
+			clear
 			#for i in "${!a_devices[@]}"; do # clean screen
 			#	pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
 			#	if ps -p $pid > /dev/null; then # if badblocks pid exists
