@@ -376,7 +376,7 @@ test_status
 fi
 
 	if [ "$b" == "1" ]; then
-		ram_count="3594304" # max ram (ram in mb * 3 / 32 * 1024)
+		ram_count="3094304" # max ram (ram in mb * 3 / 32 * 1024)
 		device_count=(`echo ${devices[@]} | wc -w`)
 		count=$(($ram_count / $device_count))
 		for i in "${devices[@]}"; do
@@ -389,7 +389,7 @@ fi
 		pid_array+=($bb_pid)
 		echo $bb_pid > $workdir/$i-pid-bb.tmp
 		done
-
+		sleep 10
 		declare -A a_devices
 		while ps -p ${pid_array[@]} > /dev/null; do # while a pid exists that badblocks created
 			for i in "${devices[@]}"; do # this container checks the file and updates below var to the current % done elapsed and error count
