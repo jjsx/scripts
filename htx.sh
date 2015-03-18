@@ -383,13 +383,13 @@ if [ "$b" == "1" ]; then
 	hdd_data
 	#blocksize=$(lsblk -o NAME,PHY-SeC | grep $i | awk '{print $2}' | uniq)
 	blocksize="4096"
-	badblocks -b $blocksize -c $count -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
+	badblocks -b 4096 -c $count -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
 	echo "Badblocks test started on /dev/$i, using block size $blocksize and block count $count."
 	bb_pid=$!
 	pid_array+=($bb_pid)
 	echo $bb_pid > $workdir/$i-pid-bb.tmp
 	done
-	sleep 10
+
 	declare -A a_devices
 	#a_devices="${devices[@]}"
 	#cat $workdir/$i-bb.tmp |grep -oh ".[0-9]..[0-9]%.*errors)" |sort -n|tail -1
@@ -411,7 +411,7 @@ if [ "$b" == "1" ]; then
 			for i in "${!a_devices[@]}"; do # clean screen
 				pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
 				if ps -p $pid > /dev/null; then # if badblocks pid exists
-					clearlastline
+					#clearlastline
 				fi
 			done
 		done
