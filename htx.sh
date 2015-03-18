@@ -62,6 +62,7 @@ secs=$1
 while [ $secs -gt 0 ]; do
    echo "${2:-} $secs seconds"
    sleep 1
+   clearlastline
    : $((secs--))
 done
 }
