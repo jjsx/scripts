@@ -412,6 +412,7 @@ if [ "$b" == "1" ]; then
 				pid=(`cat $workdir/$i-pid-bb.tmp`) # badblocks pid
 				if ps -p $pid > /dev/null; then # if badblocks pid exists
 					#clearlastline
+					echo
 				fi
 			done
 		done
