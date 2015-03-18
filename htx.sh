@@ -376,14 +376,13 @@ test_status
 fi
 
 	if [ "$b" == "1" ]; then
-		ram_count="3094304" # max ram (ram in mb * 3 / 32 * 1024)
+		ram_count="2400000" # max ram (ram in mb * 3 / 32 * 256 (512 block))
 		device_count=(`echo ${devices[@]} | wc -w`)
 		count=$(($ram_count / $device_count))
 		for i in "${devices[@]}"; do
 		hdd_data
-		#blocksize=$(lsblk -o NAME,PHY-SeC | grep $i | awk '{print $2}' | uniq)
-		blocksize="4096"
-		badblocks -b 4096 -c $count -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
+		blocksize=$(lsblk -o NAME,PHY-SeC | grep $i | awk '{print $2}' | uniq)
+		badblocks -b $blocksize -c $count -v -w -o $workdir/${serial}-badblocks.txt -s /dev/$i &> $workdir/$i-bb.tmp &
 		echo "Badblocks test started on /dev/$i, using block size $blocksize and block count $count."
 		bb_pid=$!
 		pid_array+=($bb_pid)
