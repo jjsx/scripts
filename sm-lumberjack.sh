@@ -22,9 +22,9 @@
 # Revision History:	
 # 2015-3-25 (1.4.2)
 #			Bug fix for NFS directory w/ Solaris
-# 2015-3-9	(1.4.1)
+# 2015-3-09	(1.4.1)
 #			Added/merged support for SunOS 5.11, Solaris 11, OpenIndiana 151a, NexentaStor 3/4
-# 2015-3-2	(1.4.0)																					  
+# 2015-3-02	(1.4.0)																					  
 #			Added support for LSIget 																  
 #			Increased log verbosity 																  
 #			Added prompts for download/installs 													  
