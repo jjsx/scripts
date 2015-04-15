@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 #                               .__               ___.                  __               __    		  
 #        ______ _____           |  |  __ __  _____\_ |__   ___________ |__|____    ____ |  | __   	  
@@ -21,7 +21,7 @@
 
 # Revision History:	
 # 2015-4-15 (1.4.3)
-#			Switched to /usr/bin/bash
+#			Switched to /usr/bin/env bash
 # 2015-3-25 (1.4.2)
 #			Bug fix for NFS directory w/ Solaris
 #			Minor edits for Solaris log gathering
