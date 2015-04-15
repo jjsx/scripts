@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 #                               .__               ___.                  __               __    		  
 #        ______ _____           |  |  __ __  _____\_ |__   ___________ |__|____    ____ |  | __   	  
@@ -15,13 +15,16 @@
 # Copyright (c) 2014-2015, Silicon Mechanics, Inc. <www.siliconmechanics.com>
 
 # This script collects log, files, and command output for diagnostics and issue resolution.
-# Supported on: RHEL 6/7, CentOS 5-7, Scientific Linux 6/7, Ubuntu 10-14, Debian 6/7, SUSE 12/13
+# Supported on: RHEL 6/7, CentOS 5-7, Scientific Linux 6/7, Ubuntu 10-14, Debian 6/7, SUSE 12/13, SunOS 5.11, Solaris 11, OpenIndiana 151a, NexentaStor 3/4
 
 # DO NOT EDIT THIS SCRIPT WITHOUT EXPLICIT PERMISSION FROM SILICON MECHANICS SUPPORT.
 
 # Revision History:	
+# 2015-4-15 (1.4.3)
+#			Switched to /usr/bin/bash
 # 2015-3-25 (1.4.2)
 #			Bug fix for NFS directory w/ Solaris
+#			Minor edits for Solaris log gathering
 # 2015-3-09 (1.4.1)
 #			Added/merged support for SunOS 5.11, Solaris 11, OpenIndiana 151a, NexentaStor 3/4
 # 2015-3-02 (1.4.0)																					  
@@ -48,25 +51,14 @@
 #			Created																					  
 
 
+
+
+
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
 # DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT #
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
 # DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT DO NOT EDIT #
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -74,7 +66,7 @@
 
 # Script
 script="sm-lumberjack"
-version="1.4.2"
+version="1.4.3"
 run_dir=$(echo "$PWD")
 user=$(whoami)
 
@@ -174,7 +166,7 @@ if [[ -r /etc/SuSE-release ]]; then
 	os=suse
 fi
 
-if [[ `cat /etc/issue | grep -i Debian` ]]; then
+if [[ $(cat /etc/issue | grep -i Debian) ]]; then
 	os=debian
 fi
 
@@ -193,7 +185,7 @@ if [[ "$os" == "unknown" ]]; then
 fi
 # Create directories
 if [[ "$os" == 'sunos' ]]; then
-dirarray=($ipmidir $cifsdir $comstardir $diskdir $hbasdir $pci_devicesdir $devfsdir $networkdir $nfsdir $kerneldir $nameservicesdir $osdir $servicesdir $systemdir $fmadir $performancedir $zfsdir $scriptdir)
+dirarray=($ipmidir $dmidir $cifsdir $nfsdir $comstardir $diskdir $hbasdir $pci_devicesdir $devfsdir $networkdir  $kerneldir $nameservicesdir $osdir $servicesdir $systemdir $fmadir $performancedir $zfsdir $scriptdir)
 else
 dirarray=($ipmidir $dmidir $diskdir $lsidir $pci_devicesdir $networkdir $nameservicesdir $osdir $systemdir $performancedir $scriptdir)
 fi
@@ -256,6 +248,68 @@ grab () {
 	cp $1 ${dir}/${grabfile} &> /dev/null
 	echo "$now $user # cp $1 ${dir}/${grabfile} &> /dev/null" >> $cmd_log
 }
+
+gen_stat_file() {
+	stats_file="$scriptdir/$script.stats"
+
+	printf "Lumberjack ($version) run stats\n" >> $stats_file
+	printf "Date Ran: $now\n" >> $stats_file
+	printf "Time Elapsed: %s\n" $(timer $tmr) >> $stats_file
+	md5=$(md5sum $script.sh)
+	printf "Script md5sum: $md5\n" >> $stats_file
+	printf "Operating System: $(head -n 1 /etc/issue)\n\n" >> $stats_file
+
+	printf "Motherboard Information:\n" >> $stats_file
+	mbmodel=$(cat $dmidir/dmidecode--t-baseboard.out | awk '/Product Name/ {print $3}')
+	printf "Model: $mbmodel\n" >> $stats_file
+	biosfw=$(cat $dmidir/dmidecode--t-bios.out | awk '/Version/ {print $2}')
+	printf "BIOS Firmware Revision: $biosfw\n" >> $stats_file
+	ipmifw=$(cat $ipmidir/ipmitool-mc-info.out | awk '/Firmware Revision/ {print $4}')
+	printf "IPMI Firmware Revision: $ipmifw\n\n" >> $stats_file
+
+	# Stats - CPU
+	printf "CPU Information:\n" >> $stats_file
+	cpus=$(cat /proc/cpuinfo | grep "model name" | sort | uniq | sed 's/.*://')
+	cpucount=$(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)
+	printf "$cpucount x $cpus\n\n" >> $stats_file
+
+	# Stats - RAM
+	dimmcount=$(cat $dmidir/dmidecode--t-memory.out | awk '/Size: [0-9]/' | wc -l)
+	totalram=$(cat $dmidir/dmidecode--t-memory.out | awk '/Size: [0-9]/ {print $2}' | head -1)
+	printf "RAM Information:\n" >> $stats_file
+	printf "$dimmcount x $totalram MB\n\n" >> $stats_file
+	printf "Populated DIMM Slots:\n" >> $stats_file
+	cat $dmidir/dmidecode--t-memory.out |grep -A 3 "Size: [0-9]" |awk '/Locator/ {print $2}' >> $stats_file
+	printf "\n" >> $stats_file
+
+	# Stats - Issues Found
+	printf "Analysis results:\n" >> $stats_file
+
+	# Stats - IPMI
+	if [[ `cat $ipmidir/ipmitool-sel-list.out | grep [1-9]` ]]; then
+	printf "EVENTS in IPMI SEL.\n" >> $stats_file
+	else
+		printf "No events in IPMI SEL.\n" >> $stats_file
+	fi
+
+	# Stats - EDAC corrected errors
+	if [[ $edac == 1 ]]; then
+		if [[ `grep -a "[1-9]" /sys/devices/system/edac/mc/mc*/csrow*/ch*_ce_count` ]]; then
+		printf "ERRORS in EDAC:\n" >> $stats_file
+		grep -a "[1-9]" /sys/devices/system/edac/mc/mc*/csrow*/ch*_ce_count >> $stats_file
+	else
+		printf "No errors in EDAC.\n" >> $stats_file
+	fi
+	fi
+	# Stats - mcelog errors
+	if [[ -f "/var/log/mcelog" ]]; then
+		if [[ -s "/var/log/mcelog" ]]; then
+			printf "ERRORS - mcelog.\n" >> $stats_file
+		fi
+	else
+		printf "No errors - mcelog.\n" >> $stats_file
+	fi
+	}
 
 #################################
 ########## BEGIN LINUX ##########
@@ -336,7 +390,7 @@ if [[ $os != 'sunos' ]]; then # if not sunos
 	dir=$lsidir
 
 
-	#if [[ `lspci | grep -i LSI` ]]; then
+	if [[ `lspci | grep -i LSI` ]]; then
 		if confirm "Gather LSI information? (requires download) [y/N]" "echo Skipping LSI information.."; then
 			printf "Gathering LSI information.. "
 			mkdir -p $lsidir/lsiget
@@ -357,7 +411,7 @@ if [[ $os != 'sunos' ]]; then # if not sunos
 			cd $run_dir
 		fi
 
-	#fi
+	fi
 
 	# LSI finished
 
@@ -511,66 +565,6 @@ if [[ $os != 'sunos' ]]; then # if not sunos
 	printf "Finishing up..\n"
 	wait
 
-	# Generate statistic file
-	stats_file="$scriptdir/$script.stats"
-
-	printf "Lumberjack ($version) run stats\n" >> $stats_file
-	printf "Date Ran: $now\n" >> $stats_file
-	printf "Time Elapsed: %s\n" $(timer $tmr) >> $stats_file
-	md5=$(md5sum $script.sh)
-	printf "Script md5sum: $md5\n" >> $stats_file
-	printf "Operating System: $(head -n 1 /etc/issue)\n\n" >> $stats_file
-
-	printf "Motherboard Information:\n" >> $stats_file
-	mbmodel=$(cat $dmidir/dmidecode--t-baseboard.out | awk '/Product Name/ {print $3}')
-	printf "Model: $mbmodel\n" >> $stats_file
-	biosfw=$(cat $dmidir/dmidecode--t-bios.out | awk '/Version/ {print $2}')
-	printf "BIOS Firmware Revision: $biosfw\n" >> $stats_file
-	ipmifw=$(cat $ipmidir/ipmitool-mc-info.out | awk '/Firmware Revision/ {print $4}')
-	printf "IPMI Firmware Revision: $ipmifw\n\n" >> $stats_file
-
-	# Stats - CPU
-	printf "CPU Information:\n" >> $stats_file
-	cpus=$(cat /proc/cpuinfo | grep "model name" | sort | uniq | sed 's/.*://')
-	cpucount=$(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)
-	printf "$cpucount x $cpus\n\n" >> $stats_file
-
-	# Stats - RAM
-	dimmcount=$(cat $dmidir/dmidecode--t-memory.out | awk '/Size: [0-9]/' | wc -l)
-	totalram=$(cat $dmidir/dmidecode--t-memory.out | awk '/Size: [0-9]/ {print $2}' | head -1)
-	printf "RAM Information:\n" >> $stats_file
-	printf "$dimmcount x $totalram MB\n\n" >> $stats_file
-	printf "Populated DIMM Slots:\n" >> $stats_file
-	cat $dmidir/dmidecode--t-memory.out |grep -A 3 "Size: [0-9]" |awk '/Locator/ {print $2}' >> $stats_file
-	printf "\n" >> $stats_file
-
-	# Stats - Issues Found
-	printf "Analysis results:\n" >> $stats_file
-
-	# Stats - IPMI
-	if [[ `cat $ipmidir/ipmitool-sel-list.out | grep [1-9]` ]]; then
-	printf "EVENTS in IPMI SEL.\n" >> $stats_file
-	else
-		printf "No events in IPMI SEL.\n" >> $stats_file
-	fi
-
-	# Stats - EDAC corrected errors
-	if [[ $edac == 1 ]]; then
-		if [[ `grep -a "[1-9]" /sys/devices/system/edac/mc/mc*/csrow*/ch*_ce_count` ]]; then
-		printf "ERRORS in EDAC:\n" >> $stats_file
-		grep -a "[1-9]" /sys/devices/system/edac/mc/mc*/csrow*/ch*_ce_count >> $stats_file
-	else
-		printf "No errors in EDAC.\n" >> $stats_file
-	fi
-	fi
-	# Stats - mcelog errors
-	if [[ -f "/var/log/mcelog" ]]; then
-		if [[ -s "/var/log/mcelog" ]]; then
-			printf "ERRORS - mcelog.\n" >> $stats_file
-		fi
-	else
-		printf "No errors - mcelog.\n" >> $stats_file
-	fi
 
 fi # if os != sunos
 
@@ -583,6 +577,36 @@ fi # if os != sunos
 #################################
 
 if [[ $os == 'sunos' ]]; then
+	# dmi
+	dir=$dmidir
+
+	printf "Gathering DMI information..\n"
+
+	run_cmd "dmidecode"
+	run_cmd "dmidecode -t bios"
+	run_cmd "dmidecode -t system"
+	run_cmd "dmidecode -t baseboard"
+	run_cmd "dmidecode -t chassis"
+	run_cmd "dmidecode -t processor"
+	run_cmd "dmidecode -t cache"
+	run_cmd "dmidecode -t memory"
+	run_cmd "dmidecode -t slot"
+	# dmi finished
+
+	# ipmi
+	dir=$ipmidir
+
+	printf "Gathering IPMI information..\n"
+
+	run_cmd "ipmitool fru"
+	run_cmd "ipmitool mc info"
+	run_cmd "ipmitool lan print"
+	run_cmd "ipmitool sel"
+	run_cmd "ipmitool sel list"
+	run_cmd "ipmitool chassis status"
+	run_cmd "ipmitool sensor"
+
+	# ipmi finished
 
 	#cifs
 	dir=$cifsdir
@@ -606,7 +630,7 @@ if [[ $os == 'sunos' ]]; then
 	run_cmd "smbstat -u 1 60" &
 	run_cmd "svccfg -s svc:/system/idmap listprop"
 
-	# cifs finished
+	#cifs finished
 
 	#comstar
 	dir=$comstardir
@@ -945,6 +969,10 @@ fi # sunos
 #################################
 ########## END SUNOS ############
 #################################
+
+
+# Generate statistic file
+gen_stat_file
 
 # Generate .tar.gz file
 dir=$scriptdir
