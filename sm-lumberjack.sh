@@ -20,6 +20,8 @@
 # DO NOT EDIT THIS SCRIPT WITHOUT EXPLICIT PERMISSION FROM SILICON MECHANICS SUPPORT.
 
 # Revision History:	
+# 2015-5-27 (1.4.4)
+#			Bug fixes (LSIget, script log)
 # 2015-4-15 (1.4.3)
 #			Switched to /usr/bin/env bash
 # 2015-3-25 (1.4.2)
@@ -66,7 +68,7 @@
 
 # Script
 script="sm-lumberjack"
-version="1.4.3"
+version="1.4.4"
 run_dir=$(echo "$PWD")
 user=$(whoami)
 
@@ -148,10 +150,6 @@ systemdir="$workdir/system"
 performancedir="$workdir/performance"
 scriptdir="$workdir/$script"
 
-# Start log
-exec > >(tee $log)
-exec 2>&1
-
 # Set OS variable
 os="unknown"
 if [[ `uname -a | grep Ubuntu` ]]; then
@@ -202,6 +200,10 @@ log="$scriptdir/$script.log"
 cmd_log="$scriptdir/commands_ran.log"
 touch $log
 touch $cmd_log
+
+# Start log
+exec > >(tee $log)
+exec 2>&1
 
 printf "\nStarting... (do not be alarmed by short pauses)\n"	
 sleep 2
@@ -407,7 +409,9 @@ if [[ $os != 'sunos' ]]; then # if not sunos
 				else
 					printf "Couldn't gather LSI data due to download or run error.\n"
 				fi
+			cd $lsidir
 			rm -rf $lsidir/lsiget &> /dev/null
+			rm -rf lsiget.tar.gz
 			cd $run_dir
 		fi
 
