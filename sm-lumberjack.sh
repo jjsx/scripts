@@ -167,7 +167,7 @@ if [[ -f /etc/SuSE-release ]]; then
 fi
 
 if [[ -f /etc/issue ]]; then
-	if [[ grep -i 'Debian' /etc/issue ]]; then
+	if [[ `grep -i 'Debian' /etc/issue` ]]; then
 		os=debian
 	fi
 fi
