@@ -19,38 +19,40 @@
 
 # DO NOT EDIT THIS SCRIPT WITHOUT EXPLICIT PERMISSION FROM SILICON MECHANICS SUPPORT.
 
-# Revision History:	
-# 2015-5-27 (1.4.4)
-#			Bug fixes (LSIget, script log)
-# 2015-4-15 (1.4.3)
-#			Switched to /usr/bin/env bash
-# 2015-3-25 (1.4.2)
-#			Bug fix for NFS directory w/ Solaris
-#			Minor edits for Solaris log gathering
-# 2015-3-09 (1.4.1)
-#			Added/merged support for SunOS 5.11, Solaris 11, OpenIndiana 151a, NexentaStor 3/4
-# 2015-3-02 (1.4.0)																					  
-#			Added support for LSIget 																  
-#			Increased log verbosity 																  
-#			Added prompts for download/installs 													  
-#			Fixed support for SUSE 12/13 															  
-# 2015-1-15 (1.3.2) 																				  
-#			Improved statistic reporting 															  
-#			Minor edits to script operation															  
-# 2014-12-9 (1.3.1) 																				  
-#			Minor edits to script operation															  
-# 2014-10-9 (1.3.0)																					  
-#			Increased log verbosity																 	  
-#			Code clean up *a lot* 																	  
-#			Various bug fixes 																		  
-# 2014-9-29 (1.2.4)																					  
-#			Added statistic reporting 																  
-# 2014-7-30 (1.2.0) 																				  
-#			Added support for SUSE & Scientific Linux 												  
-# 2014-7-30 (1.1.0)																					  
-#			Added support for Ubuntu & Debian 														  
-# 2014-6-24 (1.0.0)																					  
-#			Created																					  
+# Revision History:
+# 2015-12-22 (1.4.5)
+#			 Bug fixes (Solaris OS)
+# 2015-5-27  (1.4.4)
+#			 Bug fixes (LSIget, script log)
+# 2015-4-15  (1.4.3)
+#			 Switched to /usr/bin/env bash
+# 2015-3-25  (1.4.2)
+#			 Bug fix for NFS directory w/ Solaris
+#			 Minor edits for Solaris log gathering
+# 2015-3-09  (1.4.1)
+#			 Added/merged support for SunOS 5.11, Solaris 11, OpenIndiana 151a, NexentaStor 3/4
+# 2015-3-02  (1.4.0)																					  
+#			 Added support for LSIget 																  
+#			 Increased log verbosity 																  
+#			 Added prompts for download/installs 													  
+#			 Fixed support for SUSE 12/13 															  
+# 2015-1-15  (1.3.2) 																				  
+#			 Improved statistic reporting 															  
+#			 Minor edits to script operation															  
+# 2014-12-9  (1.3.1) 																				  
+#			 Minor edits to script operation															  
+# 2014-10-9  (1.3.0)																					  
+#			 Increased log verbosity																 	  
+#			 Code clean up *a lot* 																	  
+#			 Various bug fixes 																		  
+# 2014-9-29  (1.2.4)																					  
+#			 Added statistic reporting 																  
+# 2014-7-30  (1.2.0) 																				  
+#			 Added support for SUSE & Scientific Linux 												  
+# 2014-7-30  (1.1.0)																					  
+#			 Added support for Ubuntu & Debian 														  
+# 2014-6-24  (1.0.0)																					  
+#			 Created																					  
 
 
 
@@ -68,7 +70,7 @@
 
 # Script
 script="sm-lumberjack"
-version="1.4.4"
+version="1.4.5"
 run_dir=$(echo "$PWD")
 user=$(whoami)
 
@@ -160,12 +162,14 @@ elif [[ `uname -a | grep -i SunOS` ]]; then
 	os=sunos
 fi
 
-if [[ -r /etc/SuSE-release ]]; then
+if [[ -f /etc/SuSE-release ]]; then
 	os=suse
 fi
 
-if [[ $(cat /etc/issue | grep -i Debian) ]]; then
-	os=debian
+if [[ -f /etc/issue ]]; then
+	if [[ grep -i 'Debian' /etc/issue ]]; then
+		os=debian
+	fi
 fi
 
 if [[ "$os" == "linux" ]]; then
@@ -259,7 +263,7 @@ gen_stat_file() {
 	printf "Time Elapsed: %s\n" $(timer $tmr) >> $stats_file
 	md5=$(md5sum $script.sh)
 	printf "Script md5sum: $md5\n" >> $stats_file
-	printf "Operating System: $(head -n 1 /etc/issue)\n\n" >> $stats_file
+	printf "Operating System: $(head -n 1 $osdir/issue)\n\n" >> $stats_file
 
 	printf "Motherboard Information:\n" >> $stats_file
 	mbmodel=$(cat $dmidir/dmidecode--t-baseboard.out | awk '/Product Name/ {print $3}')
@@ -271,8 +275,8 @@ gen_stat_file() {
 
 	# Stats - CPU
 	printf "CPU Information:\n" >> $stats_file
-	cpus=$(cat /proc/cpuinfo | grep "model name" | sort | uniq | sed 's/.*://')
-	cpucount=$(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)
+	cpus=$(cat $systemdir/cpuinfo | grep "model name" | sort | uniq | sed 's/.*://')
+	cpucount=$(cat $systemdir/cpuinfo | grep "physical id" | sort | uniq | wc -l)
 	printf "$cpucount x $cpus\n\n" >> $stats_file
 
 	# Stats - RAM
@@ -577,7 +581,7 @@ fi # if os != sunos
 #################################
 
 #################################
-########## BEGIN SUNOS ##########
+###### BEGIN SOLARIS / ZFS ######
 #################################
 
 if [[ $os == 'sunos' ]]; then
@@ -976,8 +980,9 @@ fi # sunos
 
 
 # Generate statistic file
+if [[ $os != 'sunos' ]]; then
 gen_stat_file
-
+fi
 # Generate .tar.gz file
 dir=$scriptdir
 
